@@ -294,40 +294,45 @@ class CitizenController extends Controller
             return redirect()->away($result['redirect_url']);
         }
 
-        // Crypto: show wallet address page for manual confirmation
+        // Crypto: redirect to NOWPayments hosted invoice — webhook confirms payment
         $serviceRequest->update([
             'payment_method' => 'crypto',
-            'transaction_id' => $result['transaction_id'],
+            'transaction_id' => $result['invoice_id'],
         ]);
-
-        return view('citizen.payment-crypto', [
-            'serviceRequest'  => $serviceRequest,
-            'wallet_address'  => $result['wallet_address'],
-            'crypto_amount'   => $result['crypto_amount'],
-            'crypto_currency' => $result['crypto_currency'],
-        ]);
+        return redirect()->away($result['invoice_url']);
     }
 
     public function paymentSuccess(Request $request, ServiceRequest $serviceRequest)
     {
         abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
 
-        $sessionId = $request->query('session_id');
-        $verified  = $sessionId
-            ? app(PaymentService::class)->verifyStripeSession($sessionId, $serviceRequest)
-            : ['success' => false, 'message' => 'No session ID provided.'];
+        // Stripe path — has a session_id in the return URL.
+        if ($sessionId = $request->query('session_id')) {
+            $verified = app(PaymentService::class)->verifyStripeSession($sessionId, $serviceRequest);
 
-        if ($verified['success']) {
-            $serviceRequest->update([
-                'payment_status' => 'paid',
-                'transaction_id' => $verified['transaction_id'],
-            ]);
-            return redirect()->route('citizen.requests.show', $serviceRequest)
-                ->with('success', 'Payment successful! Your request is now being processed.');
+            if ($verified['success']) {
+                $serviceRequest->update([
+                    'payment_status' => 'paid',
+                    'transaction_id' => $verified['transaction_id'],
+                ]);
+                return redirect()->route('citizen.requests.show', $serviceRequest)
+                    ->with('success', 'Payment successful! Your request is now being processed.');
+            }
+
+            return redirect()->route('citizen.payment', $serviceRequest)
+                ->withErrors(['payment' => $verified['message']]);
         }
 
-        return redirect()->route('citizen.payment', $serviceRequest)
-            ->withErrors(['payment' => $verified['message']]);
+        // NOWPayments path — webhook is the source of truth. If it already fired,
+        // the request is paid; otherwise we tell the citizen we're still waiting
+        // for blockchain confirmation.
+        if ($serviceRequest->payment_status === 'paid') {
+            return redirect()->route('citizen.requests.show', $serviceRequest)
+                ->with('success', 'Crypto payment received! Your request is now being processed.');
+        }
+
+        return redirect()->route('citizen.requests.show', $serviceRequest)
+            ->with('warning', 'Payment is being confirmed on the blockchain. This page will update once it clears (usually a few minutes).');
     }
 
     public function paymentCancel(ServiceRequest $serviceRequest)
@@ -336,26 +341,6 @@ class CitizenController extends Controller
 
         return redirect()->route('citizen.payment', $serviceRequest)
             ->with('warning', 'Payment was cancelled. You can try again.');
-    }
-
-    public function confirmCryptoPayment(Request $request, ServiceRequest $serviceRequest)
-    {
-        abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
-
-        $data = $request->validate(['tx_hash' => 'required|string|max:200']);
-
-        $result = app(PaymentService::class)->confirmCrypto($serviceRequest, $data['tx_hash']);
-
-        if ($result['success']) {
-            $serviceRequest->update([
-                'payment_status' => 'paid',
-                'transaction_id' => $result['transaction_id'],
-            ]);
-            return redirect()->route('citizen.requests.show', $serviceRequest)
-                ->with('success', 'Crypto payment confirmed! Your request is now being processed.');
-        }
-
-        return back()->withErrors(['payment' => $result['message']]);
     }
 
     // ── My Requests ───────────────────────────────────────────────

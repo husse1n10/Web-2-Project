@@ -14,6 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Trust Heroku's load balancer so HTTPS is detected correctly.
         $middleware->trustProxies(at: '*');
+
+        // Exclude external webhooks from CSRF — they're authenticated via HMAC signature.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/*',
+        ]);
         // Redirect authenticated users away from guest-only pages to their dashboard.
         $middleware->redirectUsersTo(function (\Illuminate\Http\Request $request) {
             $user = $request->user();

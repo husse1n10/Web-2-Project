@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Office\OfficeController;
 use App\Http\Controllers\Citizen\CitizenController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
@@ -24,6 +25,9 @@ Route::get('/', function () {
     };
 })->name('home');
 Route::get('/track/{reference}', [CitizenController::class, 'trackByQr'])->name('citizen.track');
+
+// Public webhooks (no auth, no CSRF — see bootstrap/app.php for CSRF exclusion).
+Route::post('/webhooks/nowpayments', [WebhookController::class, 'nowpayments'])->name('webhooks.nowpayments');
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -153,8 +157,6 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
         Route::post('/requests/{serviceRequest}/payment', [CitizenController::class, 'processPayment'])->name('payment.process');
         Route::get('/requests/{serviceRequest}/payment/success',  [CitizenController::class, 'paymentSuccess'])->name('payment.success');
         Route::get('/requests/{serviceRequest}/payment/cancel',   [CitizenController::class, 'paymentCancel'])->name('payment.cancel');
-
-        Route::post('/requests/{serviceRequest}/payment/crypto',  [CitizenController::class, 'confirmCryptoPayment'])->name('payment.crypto.confirm');
 
         // Appointments
         Route::post('/appointments', [CitizenController::class, 'bookAppointment'])->name('appointments.book');

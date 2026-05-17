@@ -40,6 +40,12 @@ return [
         'secret' => env('STRIPE_SECRET'),
     ],
 
+    'nowpayments' => [
+        'api_key'    => env('NOWPAYMENTS_API_KEY'),
+        'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
+        'base_url'   => env('NOWPAYMENTS_BASE_URL', 'https://api.sandbox.nowpayments.io/v1'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Social OAuth Providers (Laravel Socialite)

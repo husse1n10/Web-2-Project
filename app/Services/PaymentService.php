@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ServiceRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
@@ -101,63 +102,107 @@ class PaymentService
         }
     }
 
-    // ── Crypto Payment (Simulated) ─────────────────────────────────
+    // ── Crypto Payment (NOWPayments hosted invoice) ────────────────
+    // Creates an invoice on NOWPayments and returns the hosted invoice URL.
+    // The citizen completes payment on NOWPayments' page; we get the final
+    // status via the IPN webhook (see WebhookController::nowpayments).
     private function processCrypto(ServiceRequest $req, array $payload): array
     {
-        try {
-            $crypto   = $payload['crypto_currency'] ?? 'BTC';
-            $usdPrice = $req->service->price;
+        $apiKey  = config('services.nowpayments.api_key');
+        $baseUrl = rtrim((string) config('services.nowpayments.base_url'), '/');
 
-            // Generate a deterministic wallet address for demo purposes
-            $walletAddresses = [
-                'BTC'  => '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-                'ETH'  => '0x32Be343B94f860124dC4fEe278FDCBD38C102D88',
-                'USDT' => 'TN2Yq6HwZvdJnU5r5LoF5hN8uR5JX1CQJD',
+        if (empty($apiKey)) {
+            return [
+                'success' => false,
+                'message' => 'Crypto payments are not configured. Please use card payment.',
             ];
+        }
 
-            $cryptoAmount = $this->convertToCrypto($usdPrice, $crypto);
+        try {
+            $response = Http::withHeaders([
+                    'x-api-key'    => $apiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->timeout(20)
+                ->post("{$baseUrl}/invoice", [
+                    'price_amount'      => (float) $req->service->price,
+                    'price_currency'    => strtolower($req->service->currency ?? 'usd'),
+                    'pay_currency'      => strtolower($payload['crypto_currency'] ?? 'btc'),
+                    'order_id'          => (string) $req->id,
+                    'order_description' => 'Service Request: ' . $req->reference_number,
+                    'ipn_callback_url'  => route('webhooks.nowpayments'),
+                    'success_url'       => route('citizen.payment.success', $req),
+                    'cancel_url'        => route('citizen.payment.cancel', $req),
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('NOWPayments invoice creation failed.', [
+                    'status' => $response->status(),
+                    'body'   => Str::limit($response->body(), 400),
+                ]);
+                return ['success' => false, 'message' => 'Could not create crypto invoice. Please try again.'];
+            }
+
+            $data = $response->json();
+            $invoiceUrl = $data['invoice_url'] ?? null;
+            $invoiceId  = $data['id'] ?? null;
+
+            if (empty($invoiceUrl)) {
+                return ['success' => false, 'message' => 'Crypto provider returned an invalid response.'];
+            }
 
             return [
-                'success'        => true,
-                'requires_confirmation' => true,
-                'wallet_address' => $walletAddresses[$crypto] ?? $walletAddresses['BTC'],
-                'crypto_amount'  => $cryptoAmount,
-                'crypto_currency'=> $crypto,
-                'transaction_id' => 'CRYPTO_' . Str::upper(Str::random(10)),
+                'success'     => true,
+                'invoice_id'  => (string) $invoiceId,
+                'invoice_url' => (string) $invoiceUrl,
             ];
-        } catch (\Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+        } catch (\Throwable $e) {
+            Log::error('NOWPayments invoice request threw: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Could not connect to crypto payment processor. Please try again.'];
         }
     }
 
-    // ── Confirm crypto payment (manual confirmation) ───────────────
-    public function confirmCrypto(ServiceRequest $req, string $txHash): array
-    {
-        // In production, verify the transaction on-chain
-        // For this project, we accept any non-empty tx hash
-        if (empty($txHash)) {
-            return ['success' => false, 'message' => 'Transaction hash is required.'];
-        }
-
-        return [
-            'success'        => true,
-            'transaction_id' => $txHash,
-        ];
-    }
-
-    // ── Convert USD to Crypto (approximate) ────────────────────────
+    // ── Convert USD to Crypto (live rates via CoinGecko + fallback) ─
     private function convertToCrypto(float $usdAmount, string $crypto): string
     {
-        // Approximate rates for demo purposes
-        $rates = [
-            'BTC'  => 65000,
+        $coinIds = [
+            'BTC'  => 'bitcoin',
+            'ETH'  => 'ethereum',
+            'USDT' => 'tether',
+        ];
+
+        $fallbackRates = [
+            'BTC'  => 78000,
             'ETH'  => 3500,
             'USDT' => 1,
         ];
 
-        $rate = $rates[$crypto] ?? 1;
-        $amount = $usdAmount / $rate;
+        $rate = Cache::remember("crypto_rate_{$crypto}", 600, function () use ($crypto, $coinIds, $fallbackRates) {
+            $coinId = $coinIds[$crypto] ?? null;
+            if (!$coinId) {
+                return $fallbackRates[$crypto] ?? 1;
+            }
 
+            try {
+                $response = Http::timeout(5)->get(
+                    'https://api.coingecko.com/api/v3/simple/price',
+                    ['ids' => $coinId, 'vs_currencies' => 'usd']
+                );
+
+                if ($response->successful()) {
+                    $live = $response->json("{$coinId}.usd");
+                    if (is_numeric($live) && $live > 0) {
+                        return (float) $live;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Fall through to fallback
+            }
+
+            return $fallbackRates[$crypto] ?? 1;
+        });
+
+        $amount = $usdAmount / $rate;
         return number_format($amount, $crypto === 'USDT' ? 2 : 8, '.', '');
     }
 
