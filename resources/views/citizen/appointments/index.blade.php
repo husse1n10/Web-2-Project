@@ -46,11 +46,22 @@
                                 {{ Str::limit($appt->notes, 50) ?? '—' }}
                             </td>
                             <td class="text-end">
-                                @if($appt->request)
-                                    <a href="{{ route('citizen.requests.show', $appt->request) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye me-1"></i> View Request
-                                    </a>
-                                @endif
+                                <div class="d-inline-flex gap-1">
+                                    @if($appt->request)
+                                        <a href="{{ route('citizen.requests.show', $appt->request) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye me-1"></i> View Request
+                                        </a>
+                                    @endif
+                                    @if(!in_array($appt->status, ['cancelled', 'completed'], true))
+                                        <form action="{{ route('citizen.appointments.cancel', $appt) }}" method="POST" onsubmit="return confirm('Cancel this appointment? This cannot be undone.');">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-x-circle me-1"></i> Cancel
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty
@@ -90,6 +101,15 @@
                 </div>
                 <div class="citizen-appt-mobile-status">
                     <x-status-pill :status="$appt->status" />
+                    @if(!in_array($appt->status, ['cancelled', 'completed'], true))
+                        <form action="{{ route('citizen.appointments.cancel', $appt) }}" method="POST" onsubmit="return confirm('Cancel this appointment? This cannot be undone.');" class="mt-1">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                <i class="bi bi-x-circle me-1"></i> Cancel
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
         @empty

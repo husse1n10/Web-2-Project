@@ -28,22 +28,23 @@ Route::get('/track/{reference}', [CitizenController::class, 'trackByQr'])->name(
 
 // Public webhooks (no auth, no CSRF — see bootstrap/app.php for CSRF exclusion).
 Route::post('/webhooks/nowpayments', [WebhookController::class, 'nowpayments'])->name('webhooks.nowpayments');
+Route::post('/webhooks/stripe',      [WebhookController::class, 'stripe'])->name('webhooks.stripe');
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 Route::middleware('guest')->group(function () {
     Route::get('/login',    [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login',   [AuthController::class, 'login']);
+    Route::post('/login',   [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register/id-extract', [AuthController::class, 'extractNationalIdDocument'])->name('register.id-extract');
-    Route::post('/register',[AuthController::class, 'register']);
+    Route::post('/register',[AuthController::class, 'register'])->middleware('throttle:5,1');
 
     Route::get('/2fa',  [AuthController::class, 'show2FA'])->name('2fa.verify');
-    Route::post('/2fa', [AuthController::class, 'verify2FA']);
+    Route::post('/2fa', [AuthController::class, 'verify2FA'])->middleware('throttle:10,1');
 
     // Password reset
     Route::get('/forgot-password',        [AuthController::class, 'showForgotPassword'])->name('password.request');
-    Route::post('/forgot-password',       [AuthController::class, 'sendResetLink'])->name('password.email');
+    Route::post('/forgot-password',       [AuthController::class, 'sendResetLink'])->name('password.email')->middleware('throttle:5,1');
     Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/reset-password',        [AuthController::class, 'resetPassword'])->name('password.update');
 
@@ -138,9 +139,12 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
     Route::get('/profile',  [CitizenController::class, 'profile'])->name('profile');
     Route::put('/profile',  [CitizenController::class, 'updateProfile'])->name('profile.update');
     Route::post('/profile/avatar', [CitizenController::class, 'updateAvatar'])->name('profile.avatar');
-    Route::post('/profile/phone/firebase-verify', [CitizenController::class, 'firebaseVerifyPhone'])->name('profile.phone.firebase');
-    Route::post('/profile/phone/send-otp',   [CitizenController::class, 'sendPhoneOtp'])->name('profile.phone.send');
-    Route::post('/profile/phone/verify-otp', [CitizenController::class, 'verifyPhoneOtp'])->name('profile.phone.verify');
+    Route::post('/profile/phone/send-otp',   [CitizenController::class, 'sendPhoneOtp'])
+        ->middleware('throttle:5,1')
+        ->name('profile.phone.send');
+    Route::post('/profile/phone/verify-otp', [CitizenController::class, 'verifyPhoneOtp'])
+        ->middleware('throttle:10,1')
+        ->name('profile.phone.verify');
     Route::post('/profile/id-extract', [AuthController::class, 'extractNationalIdDocument'])->name('profile.id-extract');
 
     // Browse
@@ -160,6 +164,7 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
 
         // Appointments
         Route::post('/appointments', [CitizenController::class, 'bookAppointment'])->name('appointments.book');
+        Route::patch('/appointments/{appointment}/cancel', [CitizenController::class, 'cancelAppointment'])->name('appointments.cancel');
 
         // Feedback
         Route::post('/feedback', [CitizenController::class, 'submitFeedback'])->name('feedback.submit');

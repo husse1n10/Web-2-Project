@@ -222,11 +222,21 @@
                             </div>
                         </div>
                         <div class="citizen-password-zone">
-                            <label class="form-label citizen-password-label">Change Password <span class="fw-normal">(leave blank to keep current)</span></label>
+                            <label class="form-label citizen-password-label">Change Password</label>
+                            <div class="mb-2">
+                                <label class="form-label">Current Password</label>
+                                <input type="password" name="current_password" class="form-control" placeholder="Enter your current password" autocomplete="current-password">
+                                @error('current_password')
+                                    <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
+                                @enderror
+                            </div>
                             <div class="citizen-password-grid">
                                 <div>
                                     <label class="form-label">New Password</label>
                                     <input type="password" name="password" class="form-control" placeholder="At least 8 characters" autocomplete="new-password">
+                                    @error('password')
+                                        <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
+                                    @enderror
                                 </div>
                                 <div>
                                     <label class="form-label">Confirm New Password</label>

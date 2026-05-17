@@ -6,6 +6,9 @@ use App\Models\ServiceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Stripe\Webhook as StripeWebhook;
+use Stripe\Exception\SignatureVerificationException;
+use UnexpectedValueException;
 
 class WebhookController extends Controller
 {
@@ -89,6 +92,96 @@ class WebhookController extends Controller
             'order_id'   => $orderId,
             'payment_id' => $payload['payment_id'] ?? null,
             'pay_currency' => $payload['pay_currency'] ?? null,
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Handle Stripe webhook events.
+     *
+     * Stripe signs every webhook with HMAC-SHA256 over `{timestamp}.{payload}`
+     * using the endpoint signing secret. We let Stripe's SDK do the verification
+     * via Webhook::constructEvent(); if the signature is bad it throws.
+     *
+     * We only act on `checkout.session.completed` — that's the event fired when
+     * a card payment goes through Stripe Checkout. Other event types are ignored
+     * but acknowledged (200 OK) so Stripe doesn't retry them.
+     */
+    public function stripe(Request $request): JsonResponse
+    {
+        $secret = (string) config('services.stripe.webhook_secret');
+        if ($secret === '') {
+            Log::warning('Stripe webhook hit but webhook_secret is not configured.');
+            return response()->json(['ok' => false, 'error' => 'not_configured'], 503);
+        }
+
+        $payload = (string) $request->getContent();
+        $sigHeader = (string) $request->header('Stripe-Signature', '');
+
+        try {
+            $event = StripeWebhook::constructEvent($payload, $sigHeader, $secret);
+        } catch (SignatureVerificationException $e) {
+            Log::warning('Stripe webhook: invalid signature.', ['ip' => $request->ip()]);
+            return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
+        } catch (UnexpectedValueException $e) {
+            return response()->json(['ok' => false, 'error' => 'invalid_payload'], 400);
+        }
+
+        // Only the checkout.session.completed event marks a request as paid.
+        if ($event->type !== 'checkout.session.completed') {
+            return response()->json(['ok' => true, 'note' => 'ignored', 'type' => $event->type]);
+        }
+
+        $session = $event->data->object;
+        $serviceRequestId = $session->metadata->service_request_id ?? null;
+
+        if (!$serviceRequestId) {
+            Log::warning('Stripe webhook: missing service_request_id metadata.', [
+                'session_id' => $session->id ?? null,
+            ]);
+            return response()->json(['ok' => true, 'note' => 'no_metadata']);
+        }
+
+        $serviceRequest = ServiceRequest::with('service')->find($serviceRequestId);
+        if (!$serviceRequest) {
+            Log::warning('Stripe webhook: service request not found.', [
+                'service_request_id' => $serviceRequestId,
+            ]);
+            return response()->json(['ok' => true, 'note' => 'order_not_found']);
+        }
+
+        // Idempotent — already paid, no-op.
+        if ($serviceRequest->payment_status === 'paid') {
+            return response()->json(['ok' => true, 'note' => 'already_paid']);
+        }
+
+        // Make sure Stripe actually charged the card.
+        if (($session->payment_status ?? null) !== 'paid') {
+            return response()->json(['ok' => true, 'note' => 'session_not_paid']);
+        }
+
+        // Amount-check defense: session amount_total must match service price * 100 (cents).
+        $expectedCents = (int) round($serviceRequest->service->price * 100);
+        $actualCents   = (int) ($session->amount_total ?? 0);
+        if ($actualCents !== $expectedCents) {
+            Log::warning('Stripe webhook: amount mismatch.', [
+                'service_request_id' => $serviceRequestId,
+                'expected_cents'     => $expectedCents,
+                'actual_cents'       => $actualCents,
+            ]);
+            return response()->json(['ok' => true, 'note' => 'amount_mismatch']);
+        }
+
+        $serviceRequest->update([
+            'payment_status' => 'paid',
+            'payment_method' => 'card',
+            'transaction_id' => $session->payment_intent ?? $serviceRequest->transaction_id,
+        ]);
+
+        Log::info('Stripe webhook: payment confirmed.', [
+            'service_request_id' => $serviceRequestId,
+            'payment_intent'     => $session->payment_intent ?? null,
         ]);
 
         return response()->json(['ok' => true]);

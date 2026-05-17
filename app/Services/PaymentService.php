@@ -162,50 +162,6 @@ class PaymentService
         }
     }
 
-    // ── Convert USD to Crypto (live rates via CoinGecko + fallback) ─
-    private function convertToCrypto(float $usdAmount, string $crypto): string
-    {
-        $coinIds = [
-            'BTC'  => 'bitcoin',
-            'ETH'  => 'ethereum',
-            'USDT' => 'tether',
-        ];
-
-        $fallbackRates = [
-            'BTC'  => 78000,
-            'ETH'  => 3500,
-            'USDT' => 1,
-        ];
-
-        $rate = Cache::remember("crypto_rate_{$crypto}", 600, function () use ($crypto, $coinIds, $fallbackRates) {
-            $coinId = $coinIds[$crypto] ?? null;
-            if (!$coinId) {
-                return $fallbackRates[$crypto] ?? 1;
-            }
-
-            try {
-                $response = Http::timeout(5)->get(
-                    'https://api.coingecko.com/api/v3/simple/price',
-                    ['ids' => $coinId, 'vs_currencies' => 'usd']
-                );
-
-                if ($response->successful()) {
-                    $live = $response->json("{$coinId}.usd");
-                    if (is_numeric($live) && $live > 0) {
-                        return (float) $live;
-                    }
-                }
-            } catch (\Exception $e) {
-                // Fall through to fallback
-            }
-
-            return $fallbackRates[$crypto] ?? 1;
-        });
-
-        $amount = $usdAmount / $rate;
-        return number_format($amount, $crypto === 'USDT' ? 2 : 8, '.', '');
-    }
-
     // ── Currency Conversion ────────────────────────────────────────
     public function convertCurrency(float $amount, string $from, string $to): float
     {

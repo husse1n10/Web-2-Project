@@ -56,7 +56,11 @@ class CitizenController extends Controller
     {
         $user = Auth::user();
         $data = $request->validate([
-            'password' => 'required|min:8|confirmed',
+            'current_password' => ['required', 'current_password'],
+            'password'         => ['required', 'min:8', 'confirmed', 'different:current_password'],
+        ], [
+            'current_password.current_password' => 'The current password you entered is incorrect.',
+            'password.different' => 'New password must be different from the current one.',
         ]);
 
         $user->password = Hash::make($data['password']);
@@ -85,18 +89,6 @@ class CitizenController extends Controller
         $user->save();
 
         return back()->with('success', 'Profile photo updated!');
-    }
-
-    public function firebaseVerifyPhone(Request $request)
-    {
-        $data = $request->validate(['phone' => 'required|string|max:20']);
-
-        $user = Auth::user();
-        $user->phone             = $data['phone'];
-        $user->phone_verified_at = now();
-        $user->save();
-
-        return response()->json(['success' => true]);
     }
 
     public function sendPhoneOtp(Request $request)
@@ -227,9 +219,13 @@ class CitizenController extends Controller
 
     public function submitRequest(Request $request, Service $service)
     {
+        // Documents are required only if the service declares required documents.
+        $hasRequiredDocs = is_array($service->required_documents) && count($service->required_documents) > 0;
+        $documentsRule   = $hasRequiredDocs ? 'required|array|min:1' : 'nullable|array';
+
         $request->validate([
             'notes'         => 'nullable|string|max:1000',
-            'documents'     => 'required|array|min:1',
+            'documents'     => $documentsRule,
             'documents.*'   => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
@@ -243,7 +239,7 @@ class CitizenController extends Controller
                 'amount_paid'      => $service->price,
             ]);
 
-            foreach ($request->file('documents') as $file) {
+            foreach ($request->file('documents') ?? [] as $file) {
                 $path = $file->store('request_documents/' . $serviceRequest->id, 'private');
                 $document = $serviceRequest->documents()->create([
                     'file_path'     => $path,
@@ -424,11 +420,41 @@ class CitizenController extends Controller
             'notes'              => 'nullable|string',
         ]);
 
+        // Block double-booking — same office + date + time, ignoring cancelled/completed.
+        $conflict = Appointment::where('office_id', $data['office_id'])
+            ->where('appointment_date', $data['appointment_date'])
+            ->where('appointment_time', $data['appointment_time'])
+            ->whereIn('status', ['scheduled', 'confirmed'])
+            ->exists();
+
+        if ($conflict) {
+            return back()
+                ->withErrors(['appointment_time' => 'This time slot is already booked. Please pick another time.'])
+                ->withInput();
+        }
+
         $appointment = Appointment::create(array_merge($data, ['citizen_id' => Auth::id()]));
         event(new AppointmentReminderBroadcast($appointment, 'appointment_booked'));
         Auth::user()?->notify(new AppointmentReminder($appointment->fresh(['request']), 'appointment_booked'));
 
         return back()->with('success', 'Appointment booked successfully.');
+    }
+
+    public function cancelAppointment(Appointment $appointment)
+    {
+        abort_unless($appointment->citizen_id === Auth::id(), 403);
+
+        if (in_array($appointment->status, ['cancelled', 'completed'], true)) {
+            return back()->withErrors([
+                'appointment' => 'This appointment can no longer be cancelled.',
+            ]);
+        }
+
+        $appointment->update(['status' => 'cancelled']);
+
+        event(new AppointmentReminderBroadcast($appointment->fresh(), 'appointment_cancelled'));
+
+        return back()->with('success', 'Appointment cancelled.');
     }
 
     // ── Feedback ──────────────────────────────────────────────────
