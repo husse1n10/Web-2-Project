@@ -86,6 +86,11 @@
                 <div class="card-body p-0">
                     <div id="officeMap" class="citizen-office-map"></div>
                 </div>
+                <a href="https://www.google.com/maps/dir/?api=1&destination={{ $office->latitude }},{{ $office->longitude }}"
+                    target="_blank"
+                    class="btn btn-primary btn-sm w-100 mt-2">
+                    <i class="bi bi-signpost-2"></i> Get Directions
+                </a>
             </div>
         @endif
 

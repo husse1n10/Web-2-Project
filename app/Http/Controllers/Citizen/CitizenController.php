@@ -382,7 +382,16 @@ class CitizenController extends Controller
     // ── My Requests ───────────────────────────────────────────────
     public function myRequests(Request $request)
     {
-        $query = Auth::user()->serviceRequests()->with(['service', 'office'])->latest();
+            $query = Auth::user()
+                ->serviceRequests()
+                ->with(['service', 'office'])
+                ->withCount([
+                    'messages as unread_messages_count' => function($q){
+                        $q->whereNull('read_at')
+                            ->where('sender_id' , '!=', Auth::id());
+                    }
+                ])
+                ->latest();
 
         if ($status = $request->status) {
             $query->where('status', $status);

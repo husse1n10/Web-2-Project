@@ -401,6 +401,11 @@ body.es-role-citizen .office-card-chip.is-rating i {
                         <a href="${office.show_url}" style="display:inline-block;padding:6px 10px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:8px;font-size:12px;">
                             View Office
                         </a>
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=${office.latitude},${office.longitude}"
+                            target="_blank"
+                            style="display:inline-block;margin-left:6px;padding:6px 10px;background:#16a34a;color:#fff;text-decoration:none;border-radius:8px;font-size:12px;">
+                            Directions
+                        </a>
                     </div>
                 `);
 
