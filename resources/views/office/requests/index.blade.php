@@ -57,6 +57,7 @@
                         <th>Status</th>
                         <th>Payment</th>
                         <th>Date</th>
+                        <th>Chat</th>
                         <th class="text-end">Action</th>
                     </tr>
                 </thead>
@@ -72,6 +73,13 @@
                             <td><x-status-pill :status="$req->status" /></td>
                             <td><x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" /></td>
                             <td class="office-request-date">{{ $req->created_at->format('M d, Y') }}</td>
+                            <td>
+                                @if(($req->unread_messages_count ?? 0) > 0)
+                                    <span class="badge bg-danger">{{ $req->unread_messages_count }} unread</span>
+                                @else
+                                    <span class="text-muted" style="font-size:.75rem">No new</span>
+                                @endif
+                            </td>
                             <td class="text-end">
                                 <a href="{{ route('office.requests.show', $req) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye me-1"></i> View
@@ -80,7 +88,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="office-request-empty-cell">
+                            <td colspan="8" class="office-request-empty-cell">
                                 <x-empty-state
                                     icon="bi-inbox"
                                     title="No requests found"
@@ -103,6 +111,9 @@
                     <x-status-pill :status="$req->status" />
                 </div>
                 <div class="office-request-mobile-service">{{ $req->service->name }}</div>
+                @if(($req->unread_messages_count ?? 0) > 0)
+                    <span class="badge bg-danger mb-1">{{ $req->unread_messages_count }} unread</span>
+                @endif
                 <div class="office-request-mobile-foot">
                     <code>{{ $req->reference_number }}</code>
                     <x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" />

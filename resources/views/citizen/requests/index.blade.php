@@ -90,6 +90,7 @@
                         <th>Status</th>
                         <th>Payment</th>
                         <th>Date</th>
+                        <th>Chat</th>
                         <th class="text-end">Action</th>
                     </tr>
                 </thead>
@@ -102,6 +103,13 @@
                             <td><x-status-pill :status="$req->status" /></td>
                             <td><x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" /></td>
                             <td class="citizen-request-date">{{ $req->created_at->format('M d, Y') }}</td>
+                            <td>
+                                @if(($req->unread_messages_count ?? 0) > 0)
+                                    <span class="badge bg-danger">{{ $req->unread_messages_count }} unread</span>
+                                @else
+                                    <span class="text-muted" style="font-size:.75rem">No new</span>
+                                @endif
+                            </td>
                             <td class="text-end">
                                 <a href="{{ route('citizen.requests.show', $req) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye me-1"></i> View
@@ -110,7 +118,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="citizen-requests-empty-cell">
+                            <td colspan="8" class="citizen-requests-empty-cell">
                                 <x-empty-state
                                     icon="bi-inbox"
                                     title="No requests found"
@@ -136,6 +144,9 @@
                 <div class="citizen-request-mobile-main">
                     <div class="citizen-request-mobile-title">{{ $req->service->name }}</div>
                     <div class="citizen-request-mobile-sub">{{ $req->office->name }}</div>
+                    @if(($req->unread_messages_count ?? 0) > 0)
+                        <span class="badge bg-danger mt-1">{{ $req->unread_messages_count }} unread</span>
+                    @endif
                     <code>{{ $req->reference_number }}</code>
                 </div>
                 <div class="citizen-request-mobile-status">

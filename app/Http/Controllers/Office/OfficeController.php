@@ -131,7 +131,15 @@ class OfficeController extends Controller
     public function requests(Request $request)
     {
         $office = $this->currentOffice();
-        $query  = $office->requests()->with(['citizen', 'service']);
+
+        $query = $office->requests()
+            ->with(['citizen', 'service'])
+            ->withCount([
+                'messages as unread_messages_count' => function ($q) {
+                    $q->whereNull('read_at')
+                        ->where('sender_id', '!=', Auth::id());
+                }
+            ]);
 
         if ($request->status) $query->where('status', $request->status);
         if ($request->search) {
