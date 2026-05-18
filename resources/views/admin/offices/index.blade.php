@@ -103,7 +103,7 @@
                         <td>
                             <div class="d-flex gap-1">
                                 <button class="btn btn-sm admin-icon-btn"
-                                        onclick='editOffice({{ $office->id }}, @js($office->name), {{ $office->municipality_id }}, {{ $office->is_active ? 1 : 0 }})'>
+                                        onclick="editOffice({{ $office->id }}, {{ Js::from($office->name) }}, {{ $office->municipality_id }}, {{ $office->is_active ? 1 : 0 }})">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form

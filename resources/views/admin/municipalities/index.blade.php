@@ -107,7 +107,7 @@
                         <td>
                             <div class="d-flex gap-1">
                                 <button class="btn btn-sm admin-icon-btn"
-                                        onclick='editMunicipality({{ $m->id }}, @js($m->name), @js($m->region), {{ $m->is_active ? 1 : 0 }})'>
+                                        onclick="editMunicipality({{ $m->id }}, {{ Js::from($m->name) }}, {{ Js::from($m->region) }}, {{ $m->is_active ? 1 : 0 }})">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form
@@ -138,7 +138,7 @@
                     <div style="display:flex;gap:.4rem;align-items:center">
                         <span class="sbadge {{ $m->is_active ? 's-approved' : 's-rejected' }}">{{ $m->is_active ? 'Active' : 'Inactive' }}</span>
                         <button class="btn btn-sm admin-icon-btn"
-                                onclick='editMunicipality({{ $m->id }}, @js($m->name), @js($m->region), {{ $m->is_active ? 1 : 0 }})'>
+                                onclick="editMunicipality({{ $m->id }}, {{ Js::from($m->name) }}, {{ Js::from($m->region) }}, {{ $m->is_active ? 1 : 0 }})">
                             <i class="bi bi-pencil" style="font-size:.8rem"></i>
                         </button>
                     </div>

@@ -46,7 +46,7 @@
                                 <div class="office-service-actions">
                                     <button
                                         class="btn btn-sm office-icon-btn"
-                                        onclick="editService({{ $svc->id }}, @json($svc->name), {{ $svc->price }}, {{ $svc->estimated_duration_days }}, '{{ $svc->is_active ? 1 : 0 }}', {{ $svc->category_id ?? 'null' }})"
+                                        onclick="editService({{ $svc->id }}, {{ Js::from($svc->name) }}, {{ $svc->price }}, {{ $svc->estimated_duration_days }}, {{ $svc->is_active ? 1 : 0 }}, {{ $svc->category_id ?? 'null' }})"
                                     >
                                         <i class="bi bi-pencil"></i>
                                     </button>

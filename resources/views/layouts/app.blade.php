@@ -21,7 +21,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
     {{-- Design System --}}
-    <link href="{{ asset('css/app.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/app.css') }}?v={{ @filemtime(public_path('css/app.css')) ?: time() }}" rel="stylesheet">
 
     <style>
         /* Role-aware dashboard theming */
@@ -34,6 +34,7 @@
             --es-surface: #FFFFFF;
             --es-border: #D9E1EC;
             --es-border-soft: #E7EDF5;
+            --es-input-border: #94A3B8;
             --es-text: #0F172A;
             --es-muted: #64748B;
             --es-subtle: #94A3B8;
@@ -59,6 +60,7 @@
             --es-surface: #FFFFFF;
             --es-border: #D7E5F6;
             --es-border-soft: #E8F0FA;
+            --es-input-border: #93B4D8;
             --es-text: #0F172A;
             --es-muted: #64748B;
             --es-subtle: #94A3B8;
@@ -84,6 +86,7 @@
             --es-surface: #FFFFFF;
             --es-border: #D8E1EF;
             --es-border-soft: #E9EEF7;
+            --es-input-border: #94A3B8;
             --es-text: #0F172A;
             --es-muted: #64748B;
             --es-subtle: #94A3B8;
@@ -307,7 +310,7 @@
             animation: citizenOrbitB 30s ease-in-out infinite;
         }
 
-        body.es-role-citizen .es-content > * {
+        body.es-role-citizen .es-content > *:not(.modal):not(.modal-backdrop) {
             position: relative;
             z-index: 1;
         }
@@ -566,8 +569,8 @@
         /* ── Form inputs glass ── */
         body.es-role-citizen .form-control,
         body.es-role-citizen .form-select {
-            background: rgba(255,255,255,0.7);
-            border: 1.5px solid rgba(203,213,225,0.5);
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #93B4D8;
             backdrop-filter: blur(4px);
             transition: all .25s ease;
         }
@@ -683,7 +686,7 @@
             filter: blur(60px);
         }
 
-        body.es-role-office_user .es-content > * {
+        body.es-role-office_user .es-content > *:not(.modal):not(.modal-backdrop) {
             position: relative;
             z-index: 1;
         }
@@ -942,8 +945,8 @@
         /* ── Glass forms ── */
         body.es-role-office_user .form-control,
         body.es-role-office_user .form-select {
-            background: rgba(255,255,255,0.65);
-            border: 1.5px solid rgba(203,213,225,0.45);
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #94A3B8;
             backdrop-filter: blur(4px);
             transition: all .25s ease;
         }
@@ -995,7 +998,7 @@
             filter: blur(60px);
         }
 
-        body.es-role-admin .es-content > * {
+        body.es-role-admin .es-content > *:not(.modal):not(.modal-backdrop) {
             position: relative;
             z-index: 1;
         }
@@ -1236,8 +1239,8 @@
         /* ── Glass forms ── */
         body.es-role-admin .form-control,
         body.es-role-admin .form-select {
-            background: rgba(255,255,255,0.65);
-            border: 1.5px solid rgba(203,213,225,0.45);
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #94A3B8;
             backdrop-filter: blur(4px);
             transition: all .25s ease;
         }
@@ -2609,7 +2612,8 @@ __mqMobile.addEventListener('change', e => { if (!e.matches) closeSidebar(); });
             if (form.dataset.busyBound === '1') return;
             form.dataset.busyBound = '1';
 
-            form.addEventListener('submit', () => {
+            form.addEventListener('submit', (event) => {
+                if (event.defaultPrevented) return;
                 const selector = form.dataset.adminBusyTarget;
                 if (!selector) return;
                 const target = document.querySelector(selector);
