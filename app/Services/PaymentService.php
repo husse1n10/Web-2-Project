@@ -31,6 +31,11 @@ class PaymentService
         };
     }
 
+    public static function toMinorUnit(float|int|string $amount): int
+    {
+        return (int) round(((float) $amount) * 100, 0, PHP_ROUND_HALF_UP);
+    }
+
     // ── Card Payment (Stripe Checkout Session) ─────────────────────
     private function processCard(ServiceRequest $req, array $payload): array
     {
@@ -44,7 +49,7 @@ class PaymentService
                             'name'        => $req->service->name,
                             'description' => 'Service Request: ' . $req->reference_number,
                         ],
-                        'unit_amount' => (int) ($req->service->price * 100),
+                        'unit_amount' => self::toMinorUnit($req->service->price),
                     ],
                     'quantity' => 1,
                 ]],
@@ -88,7 +93,7 @@ class PaymentService
 
             // Confirm the amount paid matches the expected price to prevent
             // a $1 session being replayed against a $1000 request.
-            $expectedCents = (int) round($req->service->price * 100);
+            $expectedCents = self::toMinorUnit($req->service->price);
             if ((int) $session->amount_total !== $expectedCents) {
                 return ['success' => false, 'message' => 'Payment amount does not match the request price.'];
             }

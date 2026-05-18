@@ -96,7 +96,7 @@ class OfficeController extends Controller
         $data   = $request->validate([
             'name'                    => 'required|string|max:255',
             'description'             => 'nullable|string',
-            'price'                   => 'required|numeric|min:0',
+            'price'                   => 'required|numeric|min:0|decimal:0,2',
             'currency'                => 'required|string|max:5',
             'estimated_duration_days' => 'required|integer|min:1',
             'required_documents'      => 'nullable|array',
@@ -112,7 +112,7 @@ class OfficeController extends Controller
         $this->authorizeOfficeOwnership($service->office_id);
         $data = $request->validate([
             'name'                    => 'required|string|max:255',
-            'price'                   => 'required|numeric',
+            'price'                   => 'required|numeric|decimal:0,2',
             'estimated_duration_days' => 'required|integer|min:1',
             'is_active'               => 'boolean',
         ]);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceRequest;
+use App\Services\PaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -162,7 +163,7 @@ class WebhookController extends Controller
         }
 
         // Amount-check defense: session amount_total must match service price * 100 (cents).
-        $expectedCents = (int) round($serviceRequest->service->price * 100);
+        $expectedCents = PaymentService::toMinorUnit($serviceRequest->service->price);
         $actualCents   = (int) ($session->amount_total ?? 0);
         if ($actualCents !== $expectedCents) {
             Log::warning('Stripe webhook: amount mismatch.', [
