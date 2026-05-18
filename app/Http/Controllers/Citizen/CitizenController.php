@@ -55,18 +55,49 @@ class CitizenController extends Controller
     public function updateProfile(Request $request)
     {
         $user = Auth::user();
-        $data = $request->validate([
-            'current_password' => ['required', 'current_password'],
-            'password'         => ['required', 'min:8', 'confirmed', 'different:current_password'],
-        ], [
+
+        $hasDocumentUpload = $request->hasFile('national_id_document');
+        $wantsPasswordUpdate = $request->filled('password')
+            || $request->filled('password_confirmation');
+
+        if (!$hasDocumentUpload && !$wantsPasswordUpdate) {
+            return back()->with('info', 'No profile changes were submitted.');
+        }
+
+        $rules = [];
+        if ($hasDocumentUpload) {
+            $rules['national_id_document'] = ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'];
+        }
+
+        if ($wantsPasswordUpdate) {
+            $rules['current_password'] = ['required', 'current_password'];
+            $rules['password'] = ['required', 'min:8', 'confirmed', 'different:current_password'];
+        }
+
+        $data = $request->validate($rules, [
             'current_password.current_password' => 'The current password you entered is incorrect.',
             'password.different' => 'New password must be different from the current one.',
         ]);
 
-        $user->password = Hash::make($data['password']);
+        if ($hasDocumentUpload) {
+            if ($user->id_document) {
+                Storage::disk('private')->delete($user->id_document);
+            }
+
+            $user->id_document = $request->file('national_id_document')->store('id_documents', 'private');
+        }
+
+        if ($wantsPasswordUpdate) {
+            $user->password = Hash::make($data['password']);
+        }
+
         $user->save();
 
-        return back()->with('success', 'Password updated successfully.');
+        $message = $hasDocumentUpload && $wantsPasswordUpdate
+            ? 'Profile document and password updated successfully.'
+            : ($hasDocumentUpload ? 'National ID document uploaded successfully.' : 'Password updated successfully.');
+
+        return back()->with('success', $message);
     }
 
     public function updateAvatar(Request $request)
@@ -131,14 +162,23 @@ class CitizenController extends Controller
     // ── My Appointments ──────────────────────────────────────────
     public function myAppointments()
     {
-        $appointments = Auth::user()->appointments()
+        $user = Auth::user();
+
+        $appointments = $user->appointments()
             ->with(['office', 'request.service'])
             ->orderByRaw("CASE WHEN appointment_date >= CURRENT_DATE THEN 0 ELSE 1 END")
             ->orderBy('appointment_date')
             ->orderBy('appointment_time')
             ->paginate(15);
 
-        return view('citizen.appointments.index', compact('appointments'));
+        $requestsNeedingAppointments = $user->serviceRequests()
+            ->with(['service', 'office'])
+            ->whereDoesntHave('appointment', fn ($query) => $query->whereIn('status', ['scheduled', 'confirmed']))
+            ->whereNotIn('status', ['rejected', 'completed'])
+            ->latest()
+            ->get();
+
+        return view('citizen.appointments.index', compact('appointments', 'requestsNeedingAppointments'));
     }
 
     // ── My Payments ──────────────────────────────────────────────
@@ -420,7 +460,26 @@ class CitizenController extends Controller
             'notes'              => 'nullable|string',
         ]);
 
-        // Block double-booking — same office + date + time, ignoring cancelled/completed.
+        // Ensure a linked request belongs to this citizen and has no active appointment.
+        if (!empty($data['service_request_id'])) {
+            $serviceRequest = ServiceRequest::where('citizen_id', Auth::id())
+                ->whereKey($data['service_request_id'])
+                ->firstOrFail();
+
+            if ((int) $data['office_id'] !== (int) $serviceRequest->office_id) {
+                return back()->withErrors([
+                    'appointment' => 'Selected office does not match this service request.',
+                ])->withInput();
+            }
+
+            if ($serviceRequest->appointment()->whereIn('status', ['scheduled', 'confirmed'])->exists()) {
+                return back()->withErrors([
+                    'appointment' => 'This request already has an appointment.',
+                ])->withInput();
+            }
+        }
+
+        // Block double-booking: same office + date + time, ignoring cancelled/completed.
         $conflict = Appointment::where('office_id', $data['office_id'])
             ->where('appointment_date', $data['appointment_date'])
             ->where('appointment_time', $data['appointment_time'])
