@@ -10,6 +10,7 @@
   --es-surface:     #FFFFFF;
   --es-border:      #E8E4DD;
   --es-border-soft: #F0EDE8;
+  --es-input-border:#CBC4B6;
   --es-text:        #1C1917;
   --es-muted:       #78716C;
   --es-subtle:      #A8A29E;
@@ -181,7 +182,7 @@ a:hover { color: var(--es-primary-dk); }
 /* Forms */
 .form-control, .form-select {
   font-family: 'Inter', sans-serif;
-  border: 1px solid var(--es-border);
+  border: 1px solid var(--es-input-border, #CBC4B6);
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   color: var(--es-text);
