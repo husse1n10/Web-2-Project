@@ -133,10 +133,21 @@
                                     <span>ID document on file — verified at registration</span>
                                 </div>
                             @else
-                                <div class="citizen-id-missing">
-                                    <i class="bi bi-exclamation-circle"></i>
-                                    <span>No ID document uploaded. Contact support.</span>
+                                <label class="citizen-upload-zone" id="idUploadZone" for="national_id_doc">
+                                    <input type="file" id="national_id_doc" name="national_id_document" accept=".jpg,.jpeg,.png,.pdf">
+                                    <span class="citizen-upload-icon"><i class="bi bi-cloud-arrow-up"></i></span>
+                                    <span class="citizen-upload-title">Upload national ID document</span>
+                                    <span class="citizen-upload-sub">JPG, PNG or PDF, max 5 MB</span>
+                                </label>
+                                <div id="uploadPreview" class="citizen-upload-preview" style="display:none">
+                                    <i class="bi bi-file-earmark-check"></i>
+                                    <span id="uploadName"></span>
                                 </div>
+                                <div class="form-text">Select the file, then press Save Changes.</div>
+                                <div id="ocrStatus" class="citizen-ocr-status" role="status" aria-live="polite"></div>
+                                @error('national_id_document')
+                                    <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
+                                @enderror
                             @endif
                         </div>
                         {{-- Phone Verification (Twilio WhatsApp OTP) --}}
@@ -671,6 +682,15 @@ body.es-role-citizen .citizen-upload-preview {
     background: rgba(236,253,245,0.6);
     color: #047857;
     font-size: .76rem;
+}
+
+body.es-role-citizen .citizen-ocr-status {
+    display: none;
+    margin-top: .55rem;
+    border-radius: .62rem;
+    padding: .5rem .7rem;
+    font-size: .76rem;
+    font-weight: 600;
 }
 
 body.es-role-citizen .citizen-password-zone {

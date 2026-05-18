@@ -45,8 +45,14 @@
                             <td class="text-end">
                                 <div class="office-service-actions">
                                     <button
+                                        type="button"
                                         class="btn btn-sm office-icon-btn"
-                                        onclick="editService({{ $svc->id }}, @json($svc->name), {{ $svc->price }}, {{ $svc->estimated_duration_days }}, '{{ $svc->is_active ? 1 : 0 }}', {{ $svc->category_id ?? 'null' }})"
+                                        data-edit-service
+                                        data-service-id="{{ $svc->id }}"
+                                        data-service-name="{{ $svc->name }}"
+                                        data-service-price="{{ $svc->price }}"
+                                        data-service-duration="{{ $svc->estimated_duration_days }}"
+                                        data-service-active="{{ $svc->is_active ? 1 : 0 }}"
                                     >
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -332,5 +338,17 @@ function editService(id, name, price, duration, active) {
     document.getElementById('esActive').value = active;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('editSvcModal')).show();
 }
+
+document.querySelectorAll('[data-edit-service]').forEach((button) => {
+    button.addEventListener('click', () => {
+        editService(
+            button.dataset.serviceId,
+            button.dataset.serviceName,
+            button.dataset.servicePrice,
+            button.dataset.serviceDuration,
+            button.dataset.serviceActive
+        );
+    });
+});
 </script>
 @endpush

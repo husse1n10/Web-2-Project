@@ -312,6 +312,10 @@
             z-index: 1;
         }
 
+        body.es-role-citizen .es-content > .modal {
+            z-index: 1060;
+        }
+
         @keyframes citizenOrbitA {
             0%, 100% { transform: translate(0, 0) scale(1); }
             33% { transform: translate(-40px, 60px) scale(1.1); }
@@ -688,6 +692,10 @@
             z-index: 1;
         }
 
+        body.es-role-office_user .es-content > .modal {
+            z-index: 1060;
+        }
+
         @keyframes officeOrbit {
             0%, 100% { transform: translate(0, 0) scale(1); }
             50% { transform: translate(-30px, 40px) scale(1.05); }
@@ -998,6 +1006,10 @@
         body.es-role-admin .es-content > * {
             position: relative;
             z-index: 1;
+        }
+
+        body.es-role-admin .es-content > .modal {
+            z-index: 1060;
         }
 
         @keyframes adminOrbit {
@@ -3015,5 +3027,4 @@ __mqMobile.addEventListener('change', e => { if (!e.matches) closeSidebar(); });
 @stack('scripts')
 </body>
 </html>
-
 
