@@ -30,6 +30,14 @@ Route::get('/', function () {
 })->name('home');
 Route::get('/track/{reference}', [CitizenController::class, 'trackByQr'])->name('citizen.track');
 
+// Language switcher — anyone (auth or guest) can switch locale.
+Route::get('/locale/{lang}', function (string $lang) {
+    if (in_array($lang, \App\Http\Middleware\SetLocale::SUPPORTED, true)) {
+        session(['locale' => $lang]);
+    }
+    return back();
+})->name('locale.switch');
+
 // Public webhooks (no auth, no CSRF — see bootstrap/app.php for CSRF exclusion).
 Route::post('/webhooks/nowpayments', [WebhookController::class, 'nowpayments'])->name('webhooks.nowpayments');
 Route::post('/webhooks/stripe',      [WebhookController::class, 'stripe'])->name('webhooks.stripe');
@@ -56,6 +64,23 @@ Route::middleware('guest')->group(function () {
     Route::get('/auth/{provider}/callback', [AuthController::class, 'handleProviderCallback'])->name('social.callback');
     Route::get('/auth/social/password',     [AuthController::class, 'showSocialPasswordForm'])->name('social.password.form');
     Route::post('/auth/social/password',    [AuthController::class, 'storeSocialPassword'])->name('social.password.store');
+});
+
+// Email verification (built-in Laravel — uses signed URLs).
+Route::middleware('auth')->group(function () {
+    Route::get('/email/verify', function () {
+        return view('auth.verify-email');
+    })->name('verification.notice');
+
+    Route::get('/email/verify/{id}/{hash}', function (\Illuminate\Foundation\Auth\EmailVerificationRequest $request) {
+        $request->fulfill();
+        return redirect()->route('home')->with('success', 'Your email has been verified.');
+    })->middleware('signed')->name('verification.verify');
+
+    Route::post('/email/verification-notification', function (\Illuminate\Http\Request $request) {
+        $request->user()->sendEmailVerificationNotification();
+        return back()->with('success', 'A fresh verification link has been sent.');
+    })->middleware('throttle:6,1')->name('verification.send');
 });
 
 Route::middleware('auth')->group(function () {
@@ -95,6 +120,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::patch('/users/{user}/identity/reject', [AdminController::class, 'rejectCitizenIdentity'])->name('users.identity.reject');
 
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/reports/export/{type}', [AdminController::class, 'exportReport'])
+        ->whereIn('type', ['requests', 'payments', 'offices'])
+        ->name('reports.export');
 
     // Support tickets
     Route::get('/support',                            [AdminController::class, 'supportIndex'])->name('support');
@@ -122,6 +150,7 @@ Route::middleware(['auth', 'role:office_user'])->prefix('office')->name('office.
     Route::get('/requests',[OfficeController::class, 'requests'])->name('requests');
     Route::get('/requests/{serviceRequest}',          [OfficeController::class, 'showRequest'])->name('requests.show');
     Route::patch('/requests/{serviceRequest}/status', [OfficeController::class, 'updateRequestStatus'])->name('requests.status');
+    Route::patch('/requests/{serviceRequest}/assign', [OfficeController::class, 'assignRequest'])->name('requests.assign');
 
     // PDF generation & download
     Route::get('/requests/{serviceRequest}/pdf/{type}', [OfficeController::class, 'downloadPdf'])->name('requests.pdf');
@@ -161,6 +190,9 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
     // Browse
     Route::get('/offices',          [CitizenController::class, 'browseOffices'])->middleware('citizen.identity.approved')->name('offices');
     Route::get('/offices/{office}', [CitizenController::class, 'showOffice'])->middleware('citizen.identity.approved')->name('offices.show');
+    Route::get('/offices/{office}/slots', [CitizenController::class, 'availableSlots'])
+        ->middleware('citizen.identity.approved')
+        ->name('offices.slots');
     Route::get('/services/{service}', [CitizenController::class, 'showService'])->middleware('citizen.identity.approved')->name('services.show');
 
     Route::middleware(['citizen.identity.approved', 'citizen.profile.complete'])->group(function () {
@@ -172,6 +204,9 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
         Route::post('/requests/{serviceRequest}/payment', [CitizenController::class, 'processPayment'])->name('payment.process');
         Route::get('/requests/{serviceRequest}/payment/success',  [CitizenController::class, 'paymentSuccess'])->name('payment.success');
         Route::get('/requests/{serviceRequest}/payment/cancel',   [CitizenController::class, 'paymentCancel'])->name('payment.cancel');
+
+        // Resubmit after missing documents / rejection
+        Route::post('/requests/{serviceRequest}/resubmit', [CitizenController::class, 'resubmitDocuments'])->name('requests.resubmit');
 
         // Appointments
         Route::post('/appointments', [CitizenController::class, 'bookAppointment'])->name('appointments.book');

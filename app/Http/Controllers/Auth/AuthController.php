@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Notifications\RegistrationConfirmation;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -71,10 +72,13 @@ class AuthController extends Controller
 
         $user->notify(new RegistrationConfirmation());
 
+        // Triggers SendEmailVerificationNotification → email with signed verify link.
+        event(new Registered($user));
+
         Auth::login($user);
         $request->session()->regenerate();
         return $this->redirectByRole($user)
-                    ->with('success', 'Welcome to E-Services!');
+                    ->with('success', 'Welcome to E-Services! Check your inbox to verify your email.');
     }
 
     public function extractNationalIdDocument(Request $request): JsonResponse

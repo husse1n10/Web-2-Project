@@ -32,4 +32,54 @@ class Office extends Model
     {
         return $this->feedbacks()->avg('rating');
     }
+
+    /**
+     * Return available 30-minute booking slots for the given date as ["HH:MM", ...].
+     * Reads working_hours JSON ({"mon": "08:00-16:00", "sat": "closed", ...}),
+     * generates half-hour slots within the range, excludes ones already booked
+     * (scheduled|confirmed appointments), and excludes past slots for today.
+     */
+    public function availableSlotsForDate(\Carbon\Carbon $date): array
+    {
+        $hours = $this->working_hours ?? [];
+        $dayKey = strtolower($date->format('D')); // "mon", "tue", ...
+        $window = $hours[$dayKey] ?? null;
+
+        if (!$window || !is_string($window) || strtolower($window) === 'closed') {
+            return [];
+        }
+
+        if (!preg_match('/^(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})$/', trim($window), $m)) {
+            return [];
+        }
+
+        $start = \Carbon\Carbon::parse($date->format('Y-m-d') . " {$m[1]}:{$m[2]}");
+        $end   = \Carbon\Carbon::parse($date->format('Y-m-d') . " {$m[3]}:{$m[4]}");
+
+        if ($end->lessThanOrEqualTo($start)) {
+            return [];
+        }
+
+        $now = now();
+        $cursor = $start->copy();
+        $slots = [];
+        while ($cursor->lessThan($end)) {
+            // Skip past slots if booking today.
+            if ($date->isToday() && $cursor->lessThanOrEqualTo($now)) {
+                $cursor->addMinutes(30);
+                continue;
+            }
+            $slots[] = $cursor->format('H:i');
+            $cursor->addMinutes(30);
+        }
+
+        $booked = Appointment::where('office_id', $this->id)
+            ->whereDate('appointment_date', $date->format('Y-m-d'))
+            ->whereIn('status', ['scheduled', 'confirmed'])
+            ->pluck('appointment_time')
+            ->map(fn ($t) => substr((string) $t, 0, 5))
+            ->all();
+
+        return array_values(array_diff($slots, $booked));
+    }
 }

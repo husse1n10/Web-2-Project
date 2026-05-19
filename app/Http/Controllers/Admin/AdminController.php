@@ -548,6 +548,86 @@ class AdminController extends Controller
         ));
     }
 
+    // ── CSV Exports ───────────────────────────────────────────────
+    public function exportReport(string $type)
+    {
+        return match ($type) {
+            'requests' => $this->streamCsv(
+                'requests-' . now()->format('Y-m-d') . '.csv',
+                ['Reference', 'Citizen', 'Service', 'Office', 'Municipality', 'Status', 'Payment Status', 'Amount Paid', 'Submitted At', 'Completed At'],
+                ServiceRequest::with(['citizen:id,name', 'service:id,name', 'office:id,name,municipality_id', 'office.municipality:id,name'])
+                    ->orderByDesc('created_at')
+                    ->lazy()
+                    ->map(fn ($r) => [
+                        $r->reference_number,
+                        optional($r->citizen)->name ?? '-',
+                        optional($r->service)->name ?? '-',
+                        optional($r->office)->name ?? '-',
+                        optional(optional($r->office)->municipality)->name ?? '-',
+                        $r->status,
+                        $r->payment_status,
+                        number_format((float) $r->amount_paid, 2, '.', ''),
+                        optional($r->created_at)->toDateTimeString() ?? '',
+                        optional($r->completed_at)->toDateTimeString() ?? '',
+                    ]),
+            ),
+            'payments' => $this->streamCsv(
+                'payments-' . now()->format('Y-m-d') . '.csv',
+                ['Reference', 'Citizen', 'Service', 'Office', 'Method', 'Transaction ID', 'Amount', 'Paid At'],
+                ServiceRequest::with(['citizen:id,name', 'service:id,name', 'office:id,name'])
+                    ->where('payment_status', 'paid')
+                    ->orderByDesc('updated_at')
+                    ->lazy()
+                    ->map(fn ($r) => [
+                        $r->reference_number,
+                        optional($r->citizen)->name ?? '-',
+                        optional($r->service)->name ?? '-',
+                        optional($r->office)->name ?? '-',
+                        $r->payment_method ?? '-',
+                        $r->transaction_id ?? '-',
+                        number_format((float) $r->amount_paid, 2, '.', ''),
+                        optional($r->updated_at)->toDateTimeString() ?? '',
+                    ]),
+            ),
+            'offices' => $this->streamCsv(
+                'offices-' . now()->format('Y-m-d') . '.csv',
+                ['Office', 'Municipality', 'Requests', 'Revenue (USD)'],
+                Office::withCount('requests')
+                    ->withSum(
+                        ['requests as revenue' => fn ($q) => $q->where('payment_status', 'paid')],
+                        'amount_paid'
+                    )
+                    ->with('municipality:id,name')
+                    ->orderByDesc('requests_count')
+                    ->lazy()
+                    ->map(fn ($o) => [
+                        $o->name,
+                        optional($o->municipality)->name ?? '-',
+                        $o->requests_count,
+                        number_format((float) ($o->revenue ?? 0), 2, '.', ''),
+                    ]),
+            ),
+            default => abort(404),
+        };
+    }
+
+    private function streamCsv(string $filename, array $headers, iterable $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return response()->streamDownload(function () use ($headers, $rows) {
+            $out = fopen('php://output', 'w');
+            // UTF-8 BOM so Excel renders Arabic / accented characters correctly.
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $headers);
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Cache-Control'       => 'no-store, no-cache, must-revalidate',
+        ]);
+    }
+
     // ── Support Tickets ───────────────────────────────────────────
     public function supportIndex(Request $request)
     {

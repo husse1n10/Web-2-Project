@@ -32,6 +32,46 @@
 <div class="office-request-detail-grid">
     <div class="office-request-left-col">
         <div class="card office-reveal" data-office-reveal>
+            <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                <span class="card-title"><i class="bi bi-person-check me-2 text-primary"></i>Assignment & SLA</span>
+                @if($serviceRequest->isOverdue())
+                    <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Overdue</span>
+                @endif
+            </div>
+            <div class="card-body">
+                @error('assigned_to')<div class="alert alert-danger" style="font-size:.78rem">{{ $message }}</div>@enderror
+                <form action="{{ route('office.requests.assign', $serviceRequest) }}" method="POST">
+                    @csrf
+                    @method('PATCH')
+                    <div class="office-status-grid">
+                        <div>
+                            <label class="form-label">Assigned To</label>
+                            <select name="assigned_to" class="form-select">
+                                <option value="">— Unassigned —</option>
+                                @foreach($officeStaff as $staff)
+                                    <option value="{{ $staff->id }}" {{ (int) $serviceRequest->assigned_to === (int) $staff->id ? 'selected' : '' }}>
+                                        {{ $staff->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Due Date</label>
+                            <input type="date" name="due_at" class="form-control"
+                                   value="{{ optional($serviceRequest->due_at)->format('Y-m-d') }}"
+                                   min="{{ now()->format('Y-m-d') }}">
+                        </div>
+                    </div>
+                    <div class="office-request-actions">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-check2 me-1"></i> Update Assignment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card office-reveal" data-office-reveal>
             <div class="card-header">
                 <span class="card-title"><i class="bi bi-arrow-repeat me-2 text-primary"></i>Update Status</span>
             </div>

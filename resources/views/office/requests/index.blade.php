@@ -30,12 +30,36 @@
                     @endforeach
                 </select>
             </div>
+            <div class="office-filter-field office-filter-status">
+                <label class="form-label">Assignee</label>
+                <select name="assigned_to" class="form-select">
+                    <option value="">Anyone</option>
+                    <option value="me" {{ request('assigned_to') === 'me' ? 'selected' : '' }}>Assigned to me</option>
+                    <option value="unassigned" {{ request('assigned_to') === 'unassigned' ? 'selected' : '' }}>Unassigned</option>
+                    @foreach($officeStaff as $staff)
+                        <option value="{{ $staff->id }}" {{ (string) request('assigned_to') === (string) $staff->id ? 'selected' : '' }}>
+                            {{ $staff->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
             <button type="submit" class="btn btn-primary office-filter-btn">
                 <i class="bi bi-funnel me-1"></i> Filter
             </button>
-            @if(request()->hasAny(['search', 'status']))
+            @if(request()->hasAny(['search', 'status', 'assigned_to', 'overdue']))
                 <a href="{{ route('office.requests') }}" class="btn btn-outline-secondary office-filter-btn">Clear</a>
             @endif
+        </form>
+
+        @if($overdueCount > 0)
+            <div class="mt-3">
+                <a href="{{ route('office.requests', ['overdue' => 1]) }}"
+                   class="btn btn-sm {{ request()->boolean('overdue') ? 'btn-danger' : 'btn-outline-danger' }}">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    {{ $overdueCount }} overdue
+                </a>
+            </div>
+        @endif
         </form>
     </div>
 </div>
@@ -55,8 +79,9 @@
                         <th>Citizen</th>
                         <th>Service</th>
                         <th>Status</th>
+                        <th>Assignee</th>
+                        <th>Due</th>
                         <th>Payment</th>
-                        <th>Date</th>
                         <th>Chat</th>
                         <th class="text-end">Action</th>
                     </tr>
@@ -71,8 +96,24 @@
                             </td>
                             <td class="office-request-service">{{ $req->service->name }}</td>
                             <td><x-status-pill :status="$req->status" /></td>
+                            <td class="office-request-date">
+                                @if($req->assignee)
+                                    {{ $req->assignee->name }}
+                                @else
+                                    <span class="text-muted" style="font-size:.75rem">Unassigned</span>
+                                @endif
+                            </td>
+                            <td class="office-request-date">
+                                @if($req->due_at)
+                                    {{ $req->due_at->format('M d') }}
+                                    @if($req->isOverdue())
+                                        <span class="badge bg-danger ms-1" style="font-size:.62rem">Overdue</span>
+                                    @endif
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
                             <td><x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" /></td>
-                            <td class="office-request-date">{{ $req->created_at->format('M d, Y') }}</td>
                             <td>
                                 @if(($req->unread_messages_count ?? 0) > 0)
                                     <span class="badge bg-danger">{{ $req->unread_messages_count }} unread</span>
@@ -88,7 +129,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="office-request-empty-cell">
+                            <td colspan="9" class="office-request-empty-cell">
                                 <x-empty-state
                                     icon="bi-inbox"
                                     title="No requests found"

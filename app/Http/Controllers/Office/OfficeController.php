@@ -133,13 +133,29 @@ class OfficeController extends Controller
         $office = $this->currentOffice();
 
         $query = $office->requests()
-            ->with(['citizen', 'service'])
+            ->with(['citizen', 'service', 'assignee:id,name'])
             ->withCount([
                 'messages as unread_messages_count' => function ($q) {
                     $q->whereNull('read_at')
                         ->where('sender_id', '!=', Auth::id());
                 }
             ]);
+
+        if ($request->boolean('overdue')) {
+            $query->whereNotIn('status', ['completed', 'rejected'])
+                  ->whereNotNull('due_at')
+                  ->where('due_at', '<', now());
+        }
+
+        if ($request->filled('assigned_to')) {
+            if ($request->assigned_to === 'unassigned') {
+                $query->whereNull('assigned_to');
+            } elseif ($request->assigned_to === 'me') {
+                $query->where('assigned_to', Auth::id());
+            } else {
+                $query->where('assigned_to', $request->assigned_to);
+            }
+        }
 
         if ($request->status) $query->where('status', $request->status);
         if ($request->search) {
@@ -152,7 +168,15 @@ class OfficeController extends Controller
 
         $requests = $query->latest()->paginate(20);
         $requests->appends($request->query());
-        return view('office.requests.index', compact('requests'));
+
+        $officeStaff = $office->users()->where('role', 'office_user')->orderBy('name')->get(['users.id', 'users.name']);
+        $overdueCount = $office->requests()
+            ->whereNotIn('status', ['completed', 'rejected'])
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+
+        return view('office.requests.index', compact('requests', 'officeStaff', 'overdueCount'));
     }
 
     public function showRequest(ServiceRequest $serviceRequest)
@@ -173,9 +197,39 @@ class OfficeController extends Controller
             event(new MessagesRead($serviceRequest->id, $readMessageIds, Auth::id()));
         }
 
-        $serviceRequest->load(['citizen', 'service', 'documents', 'statusLogs.changedBy', 'messages.sender', 'appointment']);
+        $serviceRequest->load(['citizen', 'service', 'documents', 'statusLogs.changedBy', 'messages.sender', 'appointment', 'assignee:id,name']);
 
-        return view('office.requests.show', compact('serviceRequest'));
+        $officeStaff = $this->currentOffice()->users()
+            ->where('role', 'office_user')
+            ->orderBy('name')
+            ->get(['users.id', 'users.name']);
+
+        return view('office.requests.show', compact('serviceRequest', 'officeStaff'));
+    }
+
+    public function assignRequest(Request $request, ServiceRequest $serviceRequest)
+    {
+        $this->authorizeOfficeOwnership($serviceRequest->office_id);
+
+        $data = $request->validate([
+            'assigned_to' => 'nullable|integer|exists:users,id',
+            'due_at'      => 'nullable|date|after_or_equal:today',
+        ]);
+
+        // Assignee must be a user attached to this office (any role on the pivot).
+        if (!empty($data['assigned_to'])) {
+            $belongs = $this->currentOffice()->users()->where('users.id', $data['assigned_to'])->exists();
+            if (!$belongs) {
+                return back()->withErrors(['assigned_to' => 'That user is not a member of this office.']);
+            }
+        }
+
+        $serviceRequest->update([
+            'assigned_to' => $data['assigned_to'] ?? null,
+            'due_at'      => $data['due_at'] ?? $serviceRequest->due_at,
+        ]);
+
+        return back()->with('success', 'Request assignment updated.');
     }
 
     public function updateRequestStatus(Request $request, ServiceRequest $serviceRequest)

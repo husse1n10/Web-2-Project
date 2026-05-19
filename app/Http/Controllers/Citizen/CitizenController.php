@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Citizen;
 
 use App\Http\Controllers\Controller;
-use App\Events\{AppointmentReminderBroadcast, NewRequestSubmitted, RequestDocumentUploaded};
+use App\Events\{AppointmentReminderBroadcast, NewRequestSubmitted, RequestDocumentUploaded, ServiceRequestStatusUpdated};
 use App\Models\{Appointment, Feedback, Message, Office, Service, ServiceRequest, SupportTicket, SupportTicketMessage, User};
 use App\Notifications\AppointmentReminder;
 use App\Notifications\NewSupportTicketNotification;
 use App\Notifications\PhoneVerificationNotification;
+use App\Notifications\RequestResubmitted;
 use App\Notifications\SupportTicketReplyNotification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
@@ -274,6 +275,8 @@ class CitizenController extends Controller
         ]);
 
         $serviceRequest = DB::transaction(function () use ($request, $service) {
+            $sla = max(1, (int) ($service->estimated_duration_days ?? 1));
+
             $serviceRequest = ServiceRequest::create([
                 'reference_number' => ServiceRequest::generateReference(),
                 'citizen_id'       => Auth::id(),
@@ -281,6 +284,7 @@ class CitizenController extends Controller
                 'office_id'        => $service->office_id,
                 'notes'            => $request->notes,
                 'amount_paid'      => $service->price,
+                'due_at'           => now()->addDays($sla),
             ]);
 
             foreach ($request->file('documents') ?? [] as $file) {
@@ -452,6 +456,69 @@ class CitizenController extends Controller
         return view('citizen.requests.track', compact('req'));
     }
 
+    // ── Resubmit Request ──────────────────────────────────────────
+    public function resubmitDocuments(Request $request, ServiceRequest $serviceRequest)
+    {
+        abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
+
+        if (!in_array($serviceRequest->status, ['missing_documents', 'rejected'], true)) {
+            return back()->withErrors([
+                'resubmit' => 'This request is not awaiting a resubmission.',
+            ]);
+        }
+
+        $data = $request->validate([
+            'documents'   => 'required|array|min:1|max:10',
+            'documents.*' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'comment'     => 'nullable|string|max:1000',
+        ]);
+
+        $oldStatus = $serviceRequest->status;
+        $comment   = trim((string) ($data['comment'] ?? ''));
+
+        DB::transaction(function () use ($request, $serviceRequest, $oldStatus, $comment) {
+            foreach ($request->file('documents') ?? [] as $file) {
+                $path = $file->store('request_documents/' . $serviceRequest->id, 'private');
+                $document = $serviceRequest->documents()->create([
+                    'file_path'     => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'uploaded_by'   => 'citizen',
+                ]);
+
+                event(new RequestDocumentUploaded($serviceRequest, $document));
+            }
+
+            $serviceRequest->update([
+                'status'       => 'pending',
+                'office_notes' => null,
+            ]);
+
+            $serviceRequest->statusLogs()->create([
+                'changed_by'  => Auth::id(),
+                'from_status' => $oldStatus,
+                'to_status'   => 'pending',
+                'comment'     => $comment !== ''
+                    ? "Citizen resubmitted documents: {$comment}"
+                    : 'Citizen resubmitted documents.',
+            ]);
+        });
+
+        $fresh = $serviceRequest->fresh();
+        event(new ServiceRequestStatusUpdated($fresh, $oldStatus, $comment !== '' ? $comment : null));
+
+        $officeUsers = User::where('role', 'office_user')
+            ->whereHas('offices', fn ($q) => $q->whereKey($serviceRequest->office_id))
+            ->where('is_active', true)
+            ->get();
+
+        if ($officeUsers->isNotEmpty()) {
+            Notification::send($officeUsers, new RequestResubmitted($fresh, $oldStatus));
+        }
+
+        return redirect()->route('citizen.requests.show', $serviceRequest)
+            ->with('success', 'Documents resubmitted. Your request is back in the queue for review.');
+    }
+
     // ── Receipt Download ──────────────────────────────────────────
     public function downloadReceipt(ServiceRequest $serviceRequest)
     {
@@ -463,6 +530,20 @@ class CitizenController extends Controller
     }
 
     // ── Appointments ──────────────────────────────────────────────
+    public function availableSlots(Office $office, Request $request)
+    {
+        $data = $request->validate([
+            'date' => 'required|date_format:Y-m-d|after:today',
+        ]);
+
+        $date = \Carbon\Carbon::parse($data['date']);
+
+        return response()->json([
+            'date'  => $date->format('Y-m-d'),
+            'slots' => $office->availableSlotsForDate($date),
+        ]);
+    }
+
     public function bookAppointment(Request $request)
     {
         $data = $request->validate([
@@ -490,6 +571,17 @@ class CitizenController extends Controller
                     'appointment' => 'This request already has an appointment.',
                 ])->withInput();
             }
+        }
+
+        // Validate the chosen slot falls within the office's working hours for that day.
+        $office = Office::find($data['office_id']);
+        $date   = \Carbon\Carbon::parse($data['appointment_date']);
+        $availableSlots = $office?->availableSlotsForDate($date) ?? [];
+
+        if (!in_array($data['appointment_time'], $availableSlots, true)) {
+            return back()
+                ->withErrors(['appointment_time' => 'This slot is not available. Pick one of the offered times.'])
+                ->withInput();
         }
 
         // Block double-booking: same office + date + time, ignoring cancelled/completed.

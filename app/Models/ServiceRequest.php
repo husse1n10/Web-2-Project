@@ -13,6 +13,7 @@ class ServiceRequest extends Model
 
     protected $fillable = [
         'reference_number', 'citizen_id', 'service_id', 'office_id',
+        'assigned_to', 'due_at',
         'status', 'notes', 'office_notes', 'qr_code',
         'amount_paid', 'payment_method', 'payment_status',
         'transaction_id', 'completed_at',
@@ -20,16 +21,29 @@ class ServiceRequest extends Model
 
     protected $casts = [
         'completed_at' => 'datetime',
+        'due_at'       => 'datetime',
     ];
 
     // ── Relationships ─────────────────────────────────────────────
     public function citizen()    { return $this->belongsTo(User::class, 'citizen_id'); }
     public function service()    { return $this->belongsTo(Service::class); }
     public function office()     { return $this->belongsTo(Office::class); }
+    public function assignee()   { return $this->belongsTo(User::class, 'assigned_to'); }
     public function documents()  { return $this->hasMany(RequestDocument::class); }
     public function statusLogs() { return $this->hasMany(RequestStatusLog::class); }
     public function messages()   { return $this->hasMany(Message::class); }
     public function appointment() { return $this->hasOne(Appointment::class); }
+
+    public function isOverdue(): bool
+    {
+        if (!$this->due_at) {
+            return false;
+        }
+        if (in_array($this->status, ['completed', 'rejected'], true)) {
+            return false;
+        }
+        return $this->due_at->isPast();
+    }
 
     // ── Helpers ───────────────────────────────────────────────────
     public static function generateReference(): string

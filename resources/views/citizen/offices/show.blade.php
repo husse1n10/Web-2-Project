@@ -146,16 +146,20 @@
             </div>
             <div class="card-body">
                 <p class="citizen-office-book-copy">Schedule an in-person visit</p>
-                <form action="{{ route('citizen.appointments.book') }}" method="POST">
+                <form action="{{ route('citizen.appointments.book') }}" method="POST"
+                      data-slots-form data-slots-url="{{ route('citizen.offices.slots', $office) }}">
                     @csrf
                     <input type="hidden" name="office_id" value="{{ $office->id }}">
                     <div class="mb-2">
                         <label class="form-label">Date</label>
-                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required>
+                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Time</label>
-                        <input type="time" name="appointment_time" class="form-control" required>
+                        <label class="form-label">Available Time Slots</label>
+                        <select name="appointment_time" class="form-select" required data-slots-select disabled>
+                            <option value="">Pick a date first…</option>
+                        </select>
+                        <div class="form-text" data-slots-status></div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-calendar-check me-1"></i> Book
@@ -486,5 +490,51 @@ function initOfficeMap() {
 
 <script async defer
     src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}&callback=initOfficeMap">
+</script>
+
+<script>
+/* ── Appointment slot picker ─────────────────────────────── */
+document.querySelectorAll('[data-slots-form]').forEach((form) => {
+    const dateInput = form.querySelector('[data-slots-date]');
+    const select    = form.querySelector('[data-slots-select]');
+    const status    = form.querySelector('[data-slots-status]');
+    const url       = form.dataset.slotsUrl;
+    const setStatus = (text) => { if (status) status.textContent = text; };
+
+    const loadSlots = async () => {
+        const date = dateInput.value;
+        if (!date) {
+            select.innerHTML = '<option value="">Pick a date first…</option>';
+            select.disabled = true;
+            setStatus('');
+            return;
+        }
+        select.disabled = true;
+        select.innerHTML = '<option value="">Loading slots…</option>';
+        setStatus('Checking availability…');
+
+        try {
+            const res = await fetch(`${url}?date=${encodeURIComponent(date)}`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!res.ok) throw new Error('Failed to load slots');
+            const data = await res.json();
+            if (!data.slots || data.slots.length === 0) {
+                select.innerHTML = '<option value="">No slots available on this date</option>';
+                setStatus('The office is closed or fully booked on this date.');
+                return;
+            }
+            select.innerHTML = '<option value="">Select a time…</option>' +
+                data.slots.map(s => `<option value="${s}">${s}</option>`).join('');
+            select.disabled = false;
+            setStatus(`${data.slots.length} slot${data.slots.length === 1 ? '' : 's'} available.`);
+        } catch (err) {
+            select.innerHTML = '<option value="">Could not load slots</option>';
+            setStatus('Something went wrong — please try again.');
+        }
+    };
+
+    dateInput.addEventListener('change', loadSlots);
+});
 </script>
 @endpush

@@ -57,6 +57,58 @@
             </div>
         </div>
 
+        @if(in_array($serviceRequest->status, ['missing_documents', 'rejected'], true))
+            <div class="card citizen-reveal citizen-resubmit-card" data-citizen-reveal>
+                <div class="card-header">
+                    <span class="card-title">
+                        <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>
+                        @if($serviceRequest->status === 'missing_documents')
+                            Action Needed — Upload Missing Documents
+                        @else
+                            Request Rejected — Resubmit with Corrections
+                        @endif
+                    </span>
+                </div>
+                <div class="card-body">
+                    @if($serviceRequest->office_notes)
+                        <div class="citizen-resubmit-note">
+                            <strong><i class="bi bi-chat-left-text me-1"></i>Office note:</strong>
+                            <p class="mb-0 mt-1">{{ $serviceRequest->office_notes }}</p>
+                        </div>
+                    @endif
+
+                    @error('resubmit')
+                        <div class="alert alert-danger" style="font-size:.8rem">{{ $message }}</div>
+                    @enderror
+                    @error('documents')
+                        <div class="alert alert-danger" style="font-size:.8rem">{{ $message }}</div>
+                    @enderror
+                    @error('documents.*')
+                        <div class="alert alert-danger" style="font-size:.8rem">{{ $message }}</div>
+                    @enderror
+
+                    <form action="{{ route('citizen.requests.resubmit', $serviceRequest) }}"
+                          method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <div class="mb-3">
+                            <label class="form-label">Replacement Documents <span class="text-danger">*</span></label>
+                            <input type="file" name="documents[]" class="form-control" multiple
+                                   accept=".jpg,.jpeg,.png,.pdf" required>
+                            <div class="form-text">JPG, PNG, or PDF — max 10 MB each.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Note to the office (optional)</label>
+                            <textarea name="comment" class="form-control" rows="2" maxlength="1000"
+                                      placeholder="Explain what was corrected or attached…"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="bi bi-upload me-1"></i> Resubmit for Review
+                        </button>
+                    </form>
+                </div>
+            </div>
+        @endif
+
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
                 <span class="card-title"><i class="bi bi-paperclip me-2 text-primary"></i>Documents</span>
@@ -238,18 +290,22 @@
                 <h6 class="modal-title fw-bold" id="aptModalLabel">Book Appointment</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ route('citizen.appointments.book') }}" method="POST">
+            <form action="{{ route('citizen.appointments.book') }}" method="POST"
+                  data-slots-form data-slots-url="{{ route('citizen.offices.slots', $serviceRequest->office_id) }}">
                 @csrf
                 <input type="hidden" name="office_id" value="{{ $serviceRequest->office_id }}">
                 <input type="hidden" name="service_request_id" value="{{ $serviceRequest->id }}">
                 <div class="modal-body pt-2">
                     <div class="mb-3">
                         <label class="form-label">Preferred Date</label>
-                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required>
+                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Preferred Time</label>
-                        <input type="time" name="appointment_time" class="form-control" required>
+                        <label class="form-label">Available Time Slots</label>
+                        <select name="appointment_time" class="form-select" required data-slots-select disabled>
+                            <option value="">Pick a date first…</option>
+                        </select>
+                        <div class="form-text" data-slots-status></div>
                     </div>
                     <div>
                         <label class="form-label">Notes (optional)</label>
@@ -604,6 +660,31 @@ body.es-role-citizen .citizen-panel-empty p {
     font-size: .8rem;
 }
 
+body.es-role-citizen .citizen-resubmit-card {
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: linear-gradient(135deg, rgba(255, 251, 235, 0.7) 0%, rgba(255, 255, 255, 0.95) 60%);
+}
+
+body.es-role-citizen .citizen-resubmit-card .card-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+body.es-role-citizen .citizen-resubmit-note {
+    padding: .6rem .8rem;
+    background: rgba(254, 243, 199, 0.55);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: .55rem;
+    font-size: .82rem;
+    color: #92400E;
+    margin-bottom: .85rem;
+}
+
+body.es-role-citizen .citizen-resubmit-note p {
+    color: #78350F;
+    font-size: .78rem;
+}
+
 body.es-role-citizen .citizen-apt-modal {
     border: 1px solid rgba(219,234,254,0.5);
     border-radius: 1.1rem;
@@ -727,5 +808,52 @@ body.es-role-citizen .citizen-apt-modal {
     loadMessages();
     setInterval(loadMessages, 2000);
     chatBox.scrollTop = chatBox.scrollHeight;
+
+    /* ── Appointment slot picker ─────────────────────────────── */
+    document.querySelectorAll('[data-slots-form]').forEach((form) => {
+        const dateInput = form.querySelector('[data-slots-date]');
+        const select    = form.querySelector('[data-slots-select]');
+        const status    = form.querySelector('[data-slots-status]');
+        const url       = form.dataset.slotsUrl;
+
+        const setStatus = (text) => { if (status) status.textContent = text; };
+
+        const loadSlots = async () => {
+            const date = dateInput.value;
+            if (!date) {
+                select.innerHTML = '<option value="">Pick a date first…</option>';
+                select.disabled = true;
+                setStatus('');
+                return;
+            }
+            select.disabled = true;
+            select.innerHTML = '<option value="">Loading slots…</option>';
+            setStatus('Checking availability…');
+
+            try {
+                const res = await fetch(`${url}?date=${encodeURIComponent(date)}`, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) throw new Error('Failed to load slots');
+                const data = await res.json();
+
+                if (!data.slots || data.slots.length === 0) {
+                    select.innerHTML = '<option value="">No slots available on this date</option>';
+                    setStatus('The office is closed or fully booked on this date.');
+                    return;
+                }
+
+                select.innerHTML = '<option value="">Select a time…</option>' +
+                    data.slots.map(s => `<option value="${s}">${s}</option>`).join('');
+                select.disabled = false;
+                setStatus(`${data.slots.length} slot${data.slots.length === 1 ? '' : 's'} available.`);
+            } catch (err) {
+                select.innerHTML = '<option value="">Could not load slots</option>';
+                setStatus('Something went wrong — please try again.');
+            }
+        };
+
+        dateInput.addEventListener('change', loadSlots);
+    });
 </script>
 @endpush

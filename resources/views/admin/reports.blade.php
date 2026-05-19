@@ -74,6 +74,18 @@
     title="Reports & Analytics"
     subtitle="Live operational metrics and request trends across offices." />
 
+<div class="d-flex flex-wrap gap-2 mb-3 admin-reveal">
+    <a href="{{ route('admin.reports.export', 'requests') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-download me-1"></i> Export Requests CSV
+    </a>
+    <a href="{{ route('admin.reports.export', 'payments') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-download me-1"></i> Export Payments CSV
+    </a>
+    <a href="{{ route('admin.reports.export', 'offices') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-download me-1"></i> Export Offices CSV
+    </a>
+</div>
+
 <div class="row g-3 mb-4">
     <div class="col-6 col-xl-3 admin-reveal">
         <x-admin.stat-card
