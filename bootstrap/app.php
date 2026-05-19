@@ -27,12 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 return route('home');
             }
 
-            if ($user->role === 'citizen' && (
-                ! $user->hasCompletedCitizenProfile() || ! $user->hasVerifiedCitizenIdentity()
-            )) {
-                return route('citizen.profile');
-            }
-
             return match ($user->role) {
                 'admin' => route('admin.dashboard'),
                 'office_user' => route('office.dashboard'),

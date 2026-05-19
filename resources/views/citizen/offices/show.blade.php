@@ -3,6 +3,9 @@
 @section('page-title', $office->name)
 
 @section('content')
+@php
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+@endphp
 <div class="citizen-office-hero citizen-reveal" data-citizen-reveal>
     <div class="citizen-office-hero-main">
         <div class="citizen-office-hero-icon">
@@ -40,10 +43,10 @@
 
 <div class="citizen-office-detail-grid">
     <div>
-        <h6 class="citizen-office-section-title">Available Services</h6>
+        <h6 class="citizen-office-section-title">{{ __('Available Services') }}</h6>
         @php $grouped = $office->services->where('is_active', true)->groupBy('category_id'); @endphp
         @forelse($grouped as $categoryId => $services)
-            @php $catName = $services->first()->category->name ?? 'General'; @endphp
+            @php $catName = $services->first()->category->name ?? __('General'); @endphp
             <div class="citizen-office-category-label">{{ $catName }}</div>
             @foreach($services as $svc)
                 <article class="citizen-office-service-card citizen-reveal" data-citizen-reveal>
@@ -56,23 +59,23 @@
                             <div class="citizen-office-service-desc">{{ Str::limit($svc->description, 85) }}</div>
                         @endif
                         <div class="citizen-office-service-meta">
-                            <span><i class="bi bi-clock me-1"></i>~{{ $svc->estimated_duration_days }} day(s)</span>
+                            <span><i class="bi bi-clock me-1"></i>~{{ $svc->estimated_duration_days }} {{ __('day(s)') }}</span>
                             @if($svc->required_documents)
-                                <span><i class="bi bi-paperclip me-1"></i>{{ count($svc->required_documents) }} doc(s) required</span>
+                                <span><i class="bi bi-paperclip me-1"></i>{{ count($svc->required_documents) }} {{ __('doc(s) required') }}</span>
                             @endif
                         </div>
                     </div>
                     <div class="citizen-office-service-cta">
                         <div class="citizen-office-service-price">${{ number_format($svc->price, 2) }}</div>
                         <a href="{{ route('citizen.services.show', $svc) }}" class="btn btn-primary btn-sm">
-                            Apply
+                            {{ __('Apply') }}
                         </a>
                     </div>
                 </article>
             @endforeach
         @empty
             <div class="card citizen-reveal" data-citizen-reveal>
-                <div class="card-body text-center text-muted py-4">No services available.</div>
+                <div class="card-body text-center text-muted py-4">{{ __('No services available.') }}</div>
             </div>
         @endforelse
     </div>
@@ -81,7 +84,7 @@
         @if($office->latitude && $office->longitude)
             <div class="card citizen-reveal" data-citizen-reveal>
                 <div class="card-header">
-                    <span class="card-title"><i class="bi bi-geo-alt me-2 text-primary"></i>Location</span>
+                    <span class="card-title"><i class="bi bi-geo-alt me-2 text-primary"></i>{{ __('Location') }}</span>
                 </div>
                 <div class="card-body p-0">
                     <div id="officeMap" class="citizen-office-map"></div>
@@ -89,7 +92,7 @@
                 <a href="https://www.google.com/maps/dir/?api=1&destination={{ $office->latitude }},{{ $office->longitude }}"
                     target="_blank"
                     class="btn btn-primary btn-sm w-100 mt-2">
-                    <i class="bi bi-signpost-2"></i> Get Directions
+                    <i class="bi bi-signpost-2"></i> {{ __('Get Directions') }}
                 </a>
             </div>
         @endif
@@ -97,15 +100,15 @@
         @if($office->working_hours)
             <div class="card citizen-reveal" data-citizen-reveal>
                 <div class="card-header">
-                    <span class="card-title"><i class="bi bi-clock me-2 text-primary"></i>Working Hours</span>
+                    <span class="card-title"><i class="bi bi-clock me-2 text-primary"></i>{{ __('Working Hours') }}</span>
                 </div>
                 <div class="card-body">
-                    @php $days = ['mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun']; @endphp
+                    @php $days = ['mon' => __('Mon'), 'tue' => __('Tue'), 'wed' => __('Wed'), 'thu' => __('Thu'), 'fri' => __('Fri'), 'sat' => __('Sat'), 'sun' => __('Sun')]; @endphp
                     @foreach($days as $key => $label)
                         @php $hours = $office->working_hours[$key] ?? null; @endphp
                         <div class="citizen-office-hours-row {{ !$loop->last ? 'with-border' : '' }}">
                             <span>{{ $label }}</span>
-                            <strong class="{{ $hours === 'closed' ? 'is-closed' : 'is-open' }}">{{ $hours ?? 'N/A' }}</strong>
+                            <strong class="{{ $hours === 'closed' ? 'is-closed' : 'is-open' }}">{{ $hours === 'closed' ? __('Closed') : ($hours ?? __('N/A')) }}</strong>
                         </div>
                     @endforeach
                 </div>
@@ -114,7 +117,7 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-star me-2" style="color:#F59E0B"></i>Recent Reviews</span>
+                <span class="card-title"><i class="bi bi-star me-2" style="color:#F59E0B"></i>{{ __('Recent Reviews') }}</span>
             </div>
             <div class="card-body p-0">
                 @forelse($office->feedbacks->take(3) as $fb)
@@ -134,7 +137,7 @@
                 @empty
                     <div class="citizen-panel-empty">
                         <i class="bi bi-chat-square-quote"></i>
-                        <p>No reviews yet.</p>
+                        <p>{{ __('No reviews yet.') }}</p>
                     </div>
                 @endforelse
             </div>
@@ -142,27 +145,32 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-calendar-plus me-2 text-primary"></i>Book Appointment</span>
+                <span class="card-title"><i class="bi bi-calendar-plus me-2 text-primary"></i>{{ __('Book Appointment') }}</span>
             </div>
             <div class="card-body">
-                <p class="citizen-office-book-copy">Schedule an in-person visit</p>
+                <p class="citizen-office-book-copy">{{ __('Schedule an in-person visit') }}</p>
+                @if($citizenActionLocked)
+                    <div class="alert alert-warning mb-3" style="font-size:.82rem;">
+                        <i class="bi bi-lock me-1"></i>{{ __('Finish your profile verification to unlock appointment booking.') }}
+                    </div>
+                @endif
                 <form action="{{ route('citizen.appointments.book') }}" method="POST"
                       data-slots-form data-slots-url="{{ route('citizen.offices.slots', $office) }}">
                     @csrf
                     <input type="hidden" name="office_id" value="{{ $office->id }}">
                     <div class="mb-2">
-                        <label class="form-label">Date</label>
-                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date>
+                        <label class="form-label">{{ __('Date') }}</label>
+                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date @disabled($citizenActionLocked)>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Available Time Slots</label>
+                        <label class="form-label">{{ __('Available Time Slots') }}</label>
                         <select name="appointment_time" class="form-select" required data-slots-select disabled>
-                            <option value="">Pick a date first…</option>
+                            <option value="">{{ __('Pick a date first…') }}</option>
                         </select>
                         <div class="form-text" data-slots-status></div>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-calendar-check me-1"></i> Book
+                    <button type="submit" class="btn btn-primary w-100" @disabled($citizenActionLocked)>
+                        <i class="bi {{ $citizenActionLocked ? 'bi-lock' : 'bi-calendar-check' }} me-1"></i> {{ $citizenActionLocked ? __('Profile Verification Required') : __('Book') }}
                     </button>
                 </form>
             </div>

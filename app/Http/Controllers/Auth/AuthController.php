@@ -923,17 +923,9 @@ class AuthController extends Controller
 
     private function redirectByRole(User $user): \Illuminate\Http\RedirectResponse
     {
-        if ($user->role === 'citizen' && !$user->hasCompletedCitizenProfile()) {
-            return redirect()->route('citizen.profile')
-                ->with('info', 'Please complete your profile before submitting requests.');
-        }
-
-        if ($user->role === 'citizen' && !$user->hasVerifiedCitizenIdentity()) {
-            $message = $user->isCitizenIdentityRejected()
-                ? 'Your National ID document was rejected. Upload a corrected document and wait for admin approval.'
-                : 'Your National ID document is pending admin validation. You can use the portal after approval.';
-
-            return redirect()->route('citizen.profile')->with('warning', $message);
+        if ($user->role === 'citizen' && ($message = $user->citizenActionRestrictionMessage())) {
+            return redirect()->route('citizen.dashboard')
+                ->with($user->hasCompletedCitizenProfile() ? 'warning' : 'info', $message);
         }
 
         return match ($user->role) {

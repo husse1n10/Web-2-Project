@@ -1,12 +1,13 @@
 @extends('layouts.app')
-@section('title', 'My Payments')
-@section('page-title', 'My Payments')
+@section('title', __('My Payments'))
+@section('page-title', __('My Payments'))
 
 @section('content')
 @php
     $allRequests = auth()->user()->serviceRequests;
     $paidCount   = $allRequests->where('payment_status', 'paid')->count();
     $unpaidCount = $allRequests->where('payment_status', '!=', 'paid')->count();
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
 @endphp
 
 {{-- Summary cards --}}
@@ -16,7 +17,7 @@
             <div class="card-body text-center py-3">
                 <div class="citizen-pay-summary-icon" style="background:linear-gradient(135deg,#10B981,#059669);"><i class="bi bi-check-circle"></i></div>
                 <div class="citizen-pay-summary-value" style="color:#059669;" data-citizen-counter="{{ $paidCount }}">{{ $paidCount }}</div>
-                <div class="citizen-pay-summary-label" style="color:#047857;">Paid</div>
+                <div class="citizen-pay-summary-label" style="color:#047857;">{{ __('Paid') }}</div>
             </div>
         </div>
     </div>
@@ -25,7 +26,7 @@
             <div class="card-body text-center py-3">
                 <div class="citizen-pay-summary-icon" style="background:linear-gradient(135deg,#F97316,#EA580C);"><i class="bi bi-hourglass-split"></i></div>
                 <div class="citizen-pay-summary-value" style="color:#EA580C;" data-citizen-counter="{{ $unpaidCount }}">{{ $unpaidCount }}</div>
-                <div class="citizen-pay-summary-label" style="color:#C2410C;">Unpaid</div>
+                <div class="citizen-pay-summary-label" style="color:#C2410C;">{{ __('Unpaid') }}</div>
             </div>
         </div>
     </div>
@@ -34,7 +35,7 @@
             <div class="card-body text-center py-3">
                 <div class="citizen-pay-summary-icon" style="background:linear-gradient(135deg,#0EA5E9,#6366F1);"><i class="bi bi-receipt"></i></div>
                 <div class="citizen-pay-summary-value" style="color:#2563EB;" data-citizen-counter="{{ $paidCount + $unpaidCount }}">{{ $paidCount + $unpaidCount }}</div>
-                <div class="citizen-pay-summary-label" style="color:#1D4ED8;">Total Requests</div>
+                <div class="citizen-pay-summary-label" style="color:#1D4ED8;">{{ __('Total Requests') }}</div>
             </div>
         </div>
     </div>
@@ -43,8 +44,8 @@
 <div class="card citizen-reveal" data-citizen-reveal>
     <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
         <div>
-            <span class="card-title">Payment History</span>
-            <div class="citizen-pay-subtitle">Track payment status for all your service requests</div>
+            <span class="card-title">{{ __('Payment History') }}</span>
+            <div class="citizen-pay-subtitle">{{ __('Track payment status for all your service requests') }}</div>
         </div>
     </div>
 
@@ -54,13 +55,13 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Reference</th>
-                        <th>Service</th>
-                        <th>Office</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Status</th>
-                        <th class="text-end">Action</th>
+                        <th>{{ __('Reference') }}</th>
+                        <th>{{ __('Service') }}</th>
+                        <th>{{ __('Office') }}</th>
+                        <th>{{ __('Amount') }}</th>
+                        <th>{{ __('Method') }}</th>
+                        <th>{{ __('Status') }}</th>
+                        <th class="text-end">{{ __('Action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -83,12 +84,18 @@
                             <td><x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" /></td>
                             <td class="text-end">
                                 @if($req->payment_status !== 'paid')
-                                    <a href="{{ route('citizen.payment', $req) }}" class="btn btn-sm btn-primary">
-                                        <i class="bi bi-credit-card me-1"></i> Pay Now
-                                    </a>
+                                    @if($citizenActionLocked)
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>
+                                            <i class="bi bi-lock me-1"></i> {{ __('Profile Verification Required') }}
+                                        </button>
+                                    @else
+                                        <a href="{{ route('citizen.payment', $req) }}" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-credit-card me-1"></i> {{ __('Pay Now') }}
+                                        </a>
+                                    @endif
                                 @else
                                     <a href="{{ route('citizen.requests.show', $req) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye me-1"></i> View
+                                        <i class="bi bi-eye me-1"></i> {{ __('View') }}
                                     </a>
                                 @endif
                             </td>
@@ -98,10 +105,10 @@
                             <td colspan="7" class="py-4">
                                 <x-empty-state
                                     icon="bi-credit-card"
-                                    title="No payments yet"
-                                    message="Payments appear after you submit a service request."
+                                    :title="__('No payments yet')"
+                                    :message="__('Payments appear after you submit a service request.')"
                                     :action-url="route('citizen.offices')"
-                                    action-label="Browse Services"
+                                    :action-label="__('Browse Services')"
                                     class="py-2"
                                 />
                             </td>

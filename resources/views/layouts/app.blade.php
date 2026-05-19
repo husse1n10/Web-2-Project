@@ -1843,6 +1843,8 @@
             ->count()
         : 0;
     $unreadCount = $user->unreadNotifications()->count();
+    $citizenActionLocked = $user->isCitizen() && !$user->canUseCitizenSelfServiceActions();
+    $citizenActionMessage = $citizenActionLocked ? $user->citizenActionRestrictionMessage() : null;
 @endphp
 
 {{-- Sidebar overlay (mobile) --}}
@@ -1880,37 +1882,37 @@
         @endif
 
             @if($user->isAdmin())
-                <span class="es-nav-section">{{ __('Administration') }}</span>
+                <span class="es-nav-section">Administration</span>
 
                 <a href="{{ route('admin.dashboard') }}"
                    class="es-nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
                     <i class="bi bi-grid-1x2"></i>
-                    <span class="es-nav-label">{{ __('Dashboard') }}</span>
+                    <span class="es-nav-label">Dashboard</span>
                 </a>
                 <a href="{{ route('admin.municipalities') }}"
                    class="es-nav-link {{ request()->routeIs('admin.municipalities*') ? 'active' : '' }}">
                     <i class="bi bi-map"></i>
-                    <span class="es-nav-label">{{ __('Municipalities') }}</span>
+                    <span class="es-nav-label">Municipalities</span>
                 </a>
                 <a href="{{ route('admin.offices') }}"
                    class="es-nav-link {{ request()->routeIs('admin.offices*') ? 'active' : '' }}">
                     <i class="bi bi-buildings"></i>
-                    <span class="es-nav-label">{{ __('Offices') }}</span>
+                    <span class="es-nav-label">Offices</span>
                 </a>
                 <a href="{{ route('admin.users') }}"
                    class="es-nav-link {{ request()->routeIs('admin.users*') ? 'active' : '' }}">
                     <i class="bi bi-people"></i>
-                    <span class="es-nav-label">{{ __('Users') }}</span>
+                    <span class="es-nav-label">Users</span>
                 </a>
                 <a href="{{ route('admin.reports') }}"
                    class="es-nav-link {{ request()->routeIs('admin.reports*') ? 'active' : '' }}">
                     <i class="bi bi-bar-chart-line"></i>
-                    <span class="es-nav-label">{{ __('Reports') }}</span>
+                    <span class="es-nav-label">Reports</span>
                 </a>
                 <a href="{{ route('admin.support') }}"
                    class="es-nav-link {{ request()->routeIs('admin.support*') ? 'active' : '' }}">
                     <i class="bi bi-life-preserver"></i>
-                    <span class="es-nav-label">{{ __('Support') }}</span>
+                    <span class="es-nav-label">Support</span>
                     @if($adminOpenTickets > 0)
                         <span class="es-nav-badge">{{ $adminOpenTickets }}</span>
                     @endif
@@ -1918,26 +1920,26 @@
                 <a href="{{ Route::has('admin.settings') ? route('admin.settings') : route('security.2fa') }}"
                    class="es-nav-link {{ request()->routeIs('admin.settings') || request()->routeIs('security.2fa') ? 'active' : '' }}">
                     <i class="bi bi-gear"></i>
-                    <span class="es-nav-label">{{ __('Settings') }}</span>
+                    <span class="es-nav-label">Settings</span>
                 </a>
 
             @elseif($user->isOfficeUser())
-                <span class="es-nav-section">{{ __('Office Panel') }}</span>
+                <span class="es-nav-section">Office Panel</span>
 
                 <a href="{{ route('office.dashboard') }}"
                    class="es-nav-link {{ request()->routeIs('office.dashboard') ? 'active' : '' }}">
                     <i class="bi bi-grid-1x2"></i>
-                    <span class="es-nav-label">{{ __('Dashboard') }}</span>
+                    <span class="es-nav-label">Dashboard</span>
                 </a>
                 <a href="{{ route('office.services') }}"
                    class="es-nav-link {{ request()->routeIs('office.services*') ? 'active' : '' }}">
                     <i class="bi bi-grid-3x3-gap"></i>
-                    <span class="es-nav-label">{{ __('Services') }}</span>
+                    <span class="es-nav-label">Services</span>
                 </a>
                 <a href="{{ route('office.requests') }}"
                    class="es-nav-link {{ request()->routeIs('office.requests*') ? 'active' : '' }}">
                     <i class="bi bi-inbox"></i>
-                    <span class="es-nav-label">{{ __('Requests') }}</span>
+                    <span class="es-nav-label">Requests</span>
                     @if($pendingOfficeRequests > 0)
                         <span class="es-nav-badge">{{ $pendingOfficeRequests }}</span>
                     @endif
@@ -1945,17 +1947,17 @@
                 <a href="{{ route('office.appointments') }}"
                    class="es-nav-link {{ request()->routeIs('office.appointments*') ? 'active' : '' }}">
                     <i class="bi bi-calendar-check"></i>
-                    <span class="es-nav-label">{{ __('Appointments') }}</span>
+                    <span class="es-nav-label">Appointments</span>
                 </a>
                 <a href="{{ route('office.feedback') }}"
                    class="es-nav-link {{ request()->routeIs('office.feedback*') ? 'active' : '' }}">
                     <i class="bi bi-chat-left-text"></i>
-                    <span class="es-nav-label">{{ __('Feedback') }}</span>
+                    <span class="es-nav-label">Feedback</span>
                 </a>
                 <a href="{{ route('office.profile') }}"
                    class="es-nav-link {{ request()->routeIs('office.profile*') ? 'active' : '' }}">
                     <i class="bi bi-id-card"></i>
-                    <span class="es-nav-label">{{ __('Profile') }}</span>
+                    <span class="es-nav-label">Profile</span>
                 </a>
 
             @else
@@ -2049,7 +2051,8 @@
                 </button>
                 @endif
 
-                {{-- Language switcher --}}
+                {{-- Language switcher — citizens only --}}
+                @if($user->isCitizen())
                 <div class="dropdown">
                     <button class="es-topbar-btn" type="button"
                             data-bs-toggle="dropdown" aria-expanded="false"
@@ -2073,6 +2076,7 @@
                         </li>
                     </ul>
                 </div>
+                @endif
 
                 {{-- Notifications --}}
                 <div class="dropdown">
@@ -2191,6 +2195,21 @@
                         @csrf
                         <button type="submit" class="btn btn-sm btn-outline-warning">Resend</button>
                     </form>
+                </div>
+            @endif
+
+            @if($citizenActionLocked && !request()->routeIs('citizen.profile*') && $citizenActionMessage)
+                <div class="alert {{ $user->isCitizenIdentityRejected() ? 'alert-danger' : 'alert-warning' }} d-flex align-items-start gap-2 mb-3" style="font-size:.85rem;">
+                    <i class="bi {{ $user->isCitizenIdentityRejected() ? 'bi-shield-x' : 'bi-shield-exclamation' }} mt-1"></i>
+                    <div class="flex-fill">
+                        <div class="fw-semibold mb-1">{{ __('Some actions are temporarily locked') }}</div>
+                        <div>{{ $citizenActionMessage }}</div>
+                        <div class="mt-2">
+                            <a href="{{ route('citizen.profile') }}" class="btn btn-sm {{ $user->isCitizenIdentityRejected() ? 'btn-outline-danger' : 'btn-outline-warning' }}">
+                                <i class="bi bi-person-lines-fill me-1"></i>{{ __('Open Profile') }}
+                            </a>
+                        </div>
+                    </div>
                 </div>
             @endif
 
@@ -3114,4 +3133,3 @@ __mqMobile.addEventListener('change', e => { if (!e.matches) closeSidebar(); });
 @stack('scripts')
 </body>
 </html>
-

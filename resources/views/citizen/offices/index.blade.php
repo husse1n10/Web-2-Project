@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'Browse Services')
-@section('page-title', 'Browse Offices')
+@section('title', __('Browse Services'))
+@section('page-title', __('Browse Offices'))
 
 @section('content')
 <div class="card mb-3 citizen-reveal" data-citizen-reveal>
@@ -12,12 +12,12 @@
                     type="text"
                     name="search"
                     class="form-control citizen-office-search-input"
-                    placeholder="Search offices by name..."
+                    placeholder="{{ __('Search offices by name...') }}"
                     value="{{ request('search') }}"
                 >
             </div>
             <select name="municipality_id" class="form-select citizen-office-filter-select">
-                <option value="">All Municipalities</option>
+                <option value="">{{ __('All Municipalities') }}</option>
                 @foreach($municipalities as $municipality)
                     <option value="{{ $municipality->id }}" {{ (string) request('municipality_id') === (string) $municipality->id ? 'selected' : '' }}>
                         {{ $municipality->name }}
@@ -25,10 +25,10 @@
                 @endforeach
             </select>
             <button type="submit" class="btn btn-primary citizen-office-filter-btn">
-                <i class="bi bi-funnel me-1"></i> Filter
+                <i class="bi bi-funnel me-1"></i> {{ __('Filter') }}
             </button>
             @if(request()->hasAny(['search', 'municipality_id']))
-                <a href="{{ route('citizen.offices') }}" class="btn btn-outline-secondary citizen-office-filter-btn">Clear</a>
+                <a href="{{ route('citizen.offices') }}" class="btn btn-outline-secondary citizen-office-filter-btn">{{ __('Clear') }}</a>
             @endif
         </form>
     </div>
@@ -36,19 +36,19 @@
 
 <div class="card mb-3 citizen-reveal" data-citizen-reveal>
     <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
-        <span class="card-title"><i class="bi bi-geo-alt me-2 text-primary"></i>Office Locations</span>
+        <span class="card-title"><i class="bi bi-geo-alt me-2 text-primary"></i>{{ __('Office Locations') }}</span>
         <div class="citizen-office-map-meta">
-            <span><strong>{{ $offices->total() }}</strong> offices found</span>
+            <span><strong>{{ $offices->total() }}</strong> {{ __('offices found') }}</span>
             <span class="mx-2">&middot;</span>
-            <span><strong>{{ $mapOffices->count() }}</strong> with map pin</span>
+            <span><strong>{{ $mapOffices->count() }}</strong> {{ __('with map pin') }}</span>
         </div>
     </div>
     <div class="card-body">
         @if($mapOffices->isEmpty())
             <x-empty-state
                 icon="bi-geo-alt"
-                title="No map locations yet"
-                message="No office locations are available to display on the map."
+                :title="__('No map locations yet')"
+                :message="__('No office locations are available to display on the map.')"
                 class="citizen-office-map-empty"
             />
         @else
@@ -62,10 +62,10 @@
         <div class="card-body">
             <x-empty-state
                 icon="bi-building-x"
-                title="No offices found"
-                message="Try another municipality or clear your filters."
+                :title="__('No offices found')"
+                :message="__('Try another municipality or clear your filters.')"
                 :action-url="route('citizen.offices')"
-                action-label="Clear Filters"
+                :action-label="__('Clear Filters')"
             />
         </div>
     </div>
@@ -106,7 +106,7 @@
 
                     <footer class="office-card-footer">
                         <span class="office-card-chip">
-                            <i class="bi bi-grid-3x3-gap me-1"></i>{{ $office->services->count() }} services
+                            <i class="bi bi-grid-3x3-gap me-1"></i>{{ $office->services->count() }} {{ __('services') }}
                         </span>
                         @php $rating = $office->averageRating(); @endphp
                         @if($rating)

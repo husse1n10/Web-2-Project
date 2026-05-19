@@ -1,12 +1,15 @@
 @extends('layouts.app')
-@section('title', 'Request ' . $serviceRequest->reference_number)
-@section('page-title', 'Request Details')
+@section('title', __('Request') . ' ' . $serviceRequest->reference_number)
+@section('page-title', __('Request Details'))
 
 @section('content')
+@php
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+@endphp
 <div class="card mb-3 citizen-reveal" data-citizen-reveal>
     <div class="card-body citizen-request-head">
         <div>
-            <span class="citizen-request-head-kicker">Service Request</span>
+            <span class="citizen-request-head-kicker">{{ __('Service Request') }}</span>
             <h5 class="citizen-request-head-title">{{ $serviceRequest->service->name }}</h5>
             <div class="citizen-request-head-sub">{{ $serviceRequest->office->name }}</div>
             <code>{{ $serviceRequest->reference_number }}</code>
@@ -19,7 +22,7 @@
     <div class="citizen-request-left-col">
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-clock-history me-2 text-primary"></i>Status History</span>
+                <span class="card-title"><i class="bi bi-clock-history me-2 text-primary"></i>{{ __('Status History') }}</span>
             </div>
             <div class="card-body">
                 @php
@@ -44,7 +47,7 @@
                             @endif
                         </div>
                         <div class="citizen-timeline-content">
-                            <div class="citizen-timeline-title">{{ ucfirst(str_replace('_', ' ', $log->to_status)) }}</div>
+                            <div class="citizen-timeline-title">{{ __(ucfirst(str_replace('_', ' ', $log->to_status))) }}</div>
                             <div class="citizen-timeline-time">{{ $log->created_at->diffForHumans() }}</div>
                             @if($log->comment)
                                 <div class="citizen-timeline-note">{{ $log->comment }}</div>
@@ -52,7 +55,7 @@
                         </div>
                     </div>
                 @empty
-                    <p class="citizen-muted-note m-0">No updates yet.</p>
+                    <p class="citizen-muted-note m-0">{{ __('No updates yet.') }}</p>
                 @endforelse
             </div>
         </div>
@@ -63,16 +66,16 @@
                     <span class="card-title">
                         <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>
                         @if($serviceRequest->status === 'missing_documents')
-                            Action Needed — Upload Missing Documents
+                            {{ __('Action Needed — Upload Missing Documents') }}
                         @else
-                            Request Rejected — Resubmit with Corrections
+                            {{ __('Request Rejected — Resubmit with Corrections') }}
                         @endif
                     </span>
                 </div>
                 <div class="card-body">
                     @if($serviceRequest->office_notes)
                         <div class="citizen-resubmit-note">
-                            <strong><i class="bi bi-chat-left-text me-1"></i>Office note:</strong>
+                            <strong><i class="bi bi-chat-left-text me-1"></i>{{ __('Office note:') }}</strong>
                             <p class="mb-0 mt-1">{{ $serviceRequest->office_notes }}</p>
                         </div>
                     @endif
@@ -91,18 +94,18 @@
                           method="POST" enctype="multipart/form-data">
                         @csrf
                         <div class="mb-3">
-                            <label class="form-label">Replacement Documents <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ __('Replacement Documents') }} <span class="text-danger">*</span></label>
                             <input type="file" name="documents[]" class="form-control" multiple
                                    accept=".jpg,.jpeg,.png,.pdf" required>
-                            <div class="form-text">JPG, PNG, or PDF — max 10 MB each.</div>
+                            <div class="form-text">{{ __('JPG, PNG, or PDF — max 10 MB each.') }}</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Note to the office (optional)</label>
+                            <label class="form-label">{{ __('Note to the office (optional)') }}</label>
                             <textarea name="comment" class="form-control" rows="2" maxlength="1000"
-                                      placeholder="Explain what was corrected or attached…"></textarea>
+                                      placeholder="{{ __('Explain what was corrected or attached…') }}"></textarea>
                         </div>
                         <button type="submit" class="btn btn-warning w-100">
-                            <i class="bi bi-upload me-1"></i> Resubmit for Review
+                            <i class="bi bi-upload me-1"></i> {{ __('Resubmit for Review') }}
                         </button>
                     </form>
                 </div>
@@ -111,7 +114,7 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-paperclip me-2 text-primary"></i>Documents</span>
+                <span class="card-title"><i class="bi bi-paperclip me-2 text-primary"></i>{{ __('Documents') }}</span>
             </div>
             <div class="card-body p-0">
                 @forelse($serviceRequest->documents as $doc)
@@ -121,7 +124,7 @@
                         </div>
                         <div class="citizen-doc-main">
                             <div class="citizen-doc-name">{{ $doc->original_name }}</div>
-                            <div class="citizen-doc-sub">Uploaded by {{ ucfirst($doc->uploaded_by) }}</div>
+                            <div class="citizen-doc-sub">{{ __('Uploaded by') }} {{ __(ucfirst($doc->uploaded_by)) }}</div>
                         </div>
                         <a href="{{ route('citizen.documents.download', [$serviceRequest, $doc->id]) }}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-download"></i>
@@ -130,7 +133,7 @@
                 @empty
                     <div class="citizen-panel-empty">
                         <i class="bi bi-folder2-open"></i>
-                        <p>No documents uploaded.</p>
+                        <p>{{ __('No documents uploaded.') }}</p>
                     </div>
                 @endforelse
             </div>
@@ -138,11 +141,11 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-chat-dots me-2 text-primary"></i>Messages</span>
+                <span class="card-title"><i class="bi bi-chat-dots me-2 text-primary"></i>{{ __('Messages') }}</span>
             </div>
             <div class="chat-box" id="chatBox">
                 @if($serviceRequest->messages->isEmpty())
-                    <div class="citizen-chat-empty">No messages yet. Start the conversation.</div>
+                    <div class="citizen-chat-empty">{{ __('No messages yet. Start the conversation.') }}</div>
                 @else
                     @foreach($serviceRequest->messages as $msg)
                         @php $mine = $msg->sender_id === auth()->id(); @endphp
@@ -151,7 +154,7 @@
                                 {{ strtoupper(substr($msg->sender->name, 0, 1)) }}
                             </div>
                             <div class="msg-bubble">
-                                <div class="msg-name">{{ $mine ? 'You' : $msg->sender->name }}</div>
+                                <div class="msg-name">{{ $mine ? __('You') : $msg->sender->name }}</div>
                                 <p>{{ $msg->body }}</p>
                                 <div class="msg-time">{{ $msg->created_at->format('H:i') }}</div>
                             </div>
@@ -161,7 +164,7 @@
             </div>
             <div class="citizen-chat-input-wrap">
                 <div class="d-flex gap-2">
-                    <input type="text" id="chatInput" class="form-control form-control-sm" placeholder="Type a message..." style="flex:1">
+                    <input type="text" id="chatInput" class="form-control form-control-sm" placeholder="{{ __('Type a message...') }}" style="flex:1">
                     <button id="sendBtn" class="btn btn-primary btn-sm" style="flex-shrink:0"><i class="bi bi-send"></i></button>
                 </div>
             </div>
@@ -172,40 +175,46 @@
         @if($serviceRequest->qr_code)
             <div class="card text-center citizen-reveal" data-citizen-reveal>
                 <div class="card-body">
-                    <div class="citizen-side-card-title">Track via QR Code</div>
+                    <div class="citizen-side-card-title">{{ __('Track via QR Code') }}</div>
                     <img src="{{ Storage::url($serviceRequest->qr_code) }}" alt="QR Code" class="citizen-qr-image">
-                    <div class="citizen-muted-note mt-2">Scan to check request status.</div>
+                    <div class="citizen-muted-note mt-2">{{ __('Scan to check request status.') }}</div>
                 </div>
             </div>
         @endif
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title">Payment</span>
+                <span class="card-title">{{ __('Payment') }}</span>
             </div>
             <div class="card-body">
                 <div class="citizen-side-row">
-                    <span>Amount Due</span>
+                    <span>{{ __('Amount Due') }}</span>
                     <strong>${{ number_format($serviceRequest->service->price, 2) }}</strong>
                 </div>
                 <div class="citizen-side-row">
-                    <span>Status</span>
+                    <span>{{ __('Status') }}</span>
                     <x-status-pill :status="$serviceRequest->payment_status === 'paid' ? 'paid' : 'unpaid'" />
                 </div>
                 @if($serviceRequest->transaction_id)
                     <div class="citizen-side-row">
-                        <span>Method</span>
+                        <span>{{ __('Method') }}</span>
                         <strong>{{ ucfirst($serviceRequest->payment_method ?? '-') }}</strong>
                     </div>
                 @endif
                 @if($serviceRequest->payment_status !== 'paid')
-                    <a href="{{ route('citizen.payment', $serviceRequest) }}" class="btn btn-primary w-100 mt-2">
-                        <i class="bi bi-credit-card me-1"></i> Pay Now
-                    </a>
+                    @if($citizenActionLocked)
+                        <button type="button" class="btn btn-outline-secondary w-100 mt-2" disabled>
+                            <i class="bi bi-lock me-1"></i> {{ __('Profile Verification Required') }}
+                        </button>
+                    @else
+                        <a href="{{ route('citizen.payment', $serviceRequest) }}" class="btn btn-primary w-100 mt-2">
+                            <i class="bi bi-credit-card me-1"></i> {{ __('Pay Now') }}
+                        </a>
+                    @endif
                 @else
-                    <div class="citizen-paid-ok"><i class="bi bi-check-circle me-1"></i>Payment complete</div>
+                    <div class="citizen-paid-ok"><i class="bi bi-check-circle me-1"></i>{{ __('Payment complete') }}</div>
                     <a href="{{ route('citizen.requests.receipt', $serviceRequest) }}" class="btn btn-outline-success w-100">
-                        <i class="bi bi-file-earmark-pdf me-1"></i> Download Receipt
+                        <i class="bi bi-file-earmark-pdf me-1"></i> {{ __('Download Receipt') }}
                     </a>
                 @endif
             </div>
@@ -213,23 +222,24 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title">Appointment</span>
+                <span class="card-title">{{ __('Appointment') }}</span>
             </div>
             <div class="card-body">
                 @if($serviceRequest->appointment)
                     <div class="citizen-side-row">
-                        <span>Date</span>
+                        <span>{{ __('Date') }}</span>
                         <strong>{{ \Carbon\Carbon::parse($serviceRequest->appointment->appointment_date)->format('M d, Y') }}</strong>
                     </div>
                     <div class="citizen-side-row">
-                        <span>Time</span>
+                        <span>{{ __('Time') }}</span>
                         <strong>{{ \Carbon\Carbon::parse($serviceRequest->appointment->appointment_time)->format('g:i A') }}</strong>
                     </div>
                     <x-status-pill :status="$serviceRequest->appointment->status" />
                 @else
-                    <p class="citizen-muted-note">No appointment scheduled yet.</p>
-                    <button class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#aptModal">
-                        <i class="bi bi-calendar-plus me-1"></i> Book Appointment
+                    <p class="citizen-muted-note">{{ __('No appointment scheduled yet.') }}</p>
+                    <button class="btn btn-outline-primary w-100" @disabled($citizenActionLocked) data-bs-toggle="modal" data-bs-target="#aptModal">
+                        <i class="bi {{ $citizenActionLocked ? 'bi-lock' : 'bi-calendar-plus' }} me-1"></i>
+                        {{ $citizenActionLocked ? __('Profile Verification Required') : __('Book Appointment') }}
                     </button>
                 @endif
             </div>
@@ -238,7 +248,7 @@
         @if($serviceRequest->status === 'completed')
             <div class="card citizen-reveal" data-citizen-reveal>
                 <div class="card-header">
-                    <span class="card-title"><i class="bi bi-star me-2 text-primary"></i>Feedback</span>
+                    <span class="card-title"><i class="bi bi-star me-2 text-primary"></i>{{ __('Feedback') }}</span>
                 </div>
                 <div class="card-body">
                     @if($errors->any())
@@ -257,24 +267,24 @@
                         <input type="hidden" name="service_request_id" value="{{ $serviceRequest->id }}">
 
                         <div class="mb-3">
-                            <label class="form-label">Rating</label>
+                            <label class="form-label">{{ __('Rating') }}</label>
                             <select name="rating" class="form-select" required>
-                                <option value="">Select rating</option>
-                                <option value="5">5 - Excellent</option>
-                                <option value="4">4 - Very Good</option>
-                                <option value="3">3 - Good</option>
-                                <option value="2">2 - Fair</option>
-                                <option value="1">1 - Poor</option>
+                                <option value="">{{ __('Select rating') }}</option>
+                                <option value="5">5 - {{ __('Excellent') }}</option>
+                                <option value="4">4 - {{ __('Very Good') }}</option>
+                                <option value="3">3 - {{ __('Good') }}</option>
+                                <option value="2">2 - {{ __('Fair') }}</option>
+                                <option value="1">1 - {{ __('Poor') }}</option>
                             </select>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Comment</label>
-                            <textarea name="comment" class="form-control" rows="3" placeholder="Write your feedback..."></textarea>
+                            <label class="form-label">{{ __('Comment') }}</label>
+                            <textarea name="comment" class="form-control" rows="3" placeholder="{{ __('Write your feedback...') }}"></textarea>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-sm w-100">
-                            <i class="bi bi-send me-1"></i> Submit Feedback
+                            <i class="bi bi-send me-1"></i> {{ __('Submit Feedback') }}
                         </button>
                     </form>
                 </div>
@@ -287,7 +297,7 @@
     <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
         <div class="modal-content citizen-apt-modal">
             <div class="modal-header border-0 pb-1">
-                <h6 class="modal-title fw-bold" id="aptModalLabel">Book Appointment</h6>
+                <h6 class="modal-title fw-bold" id="aptModalLabel">{{ __('Book Appointment') }}</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="{{ route('citizen.appointments.book') }}" method="POST"
@@ -297,24 +307,24 @@
                 <input type="hidden" name="service_request_id" value="{{ $serviceRequest->id }}">
                 <div class="modal-body pt-2">
                     <div class="mb-3">
-                        <label class="form-label">Preferred Date</label>
-                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date>
+                        <label class="form-label">{{ __('Preferred Date') }}</label>
+                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date @disabled($citizenActionLocked)>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Available Time Slots</label>
+                        <label class="form-label">{{ __('Available Time Slots') }}</label>
                         <select name="appointment_time" class="form-select" required data-slots-select disabled>
-                            <option value="">Pick a date first…</option>
+                            <option value="">{{ __('Pick a date first…') }}</option>
                         </select>
                         <div class="form-text" data-slots-status></div>
                     </div>
                     <div>
-                        <label class="form-label">Notes (optional)</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="Any specific notes..."></textarea>
+                        <label class="form-label">{{ __('Notes (optional)') }}</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="{{ __('Any specific notes...') }}" @disabled($citizenActionLocked)></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Confirm Booking</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-primary btn-sm" @disabled($citizenActionLocked)>{{ $citizenActionLocked ? __('Profile Verification Required') : __('Confirm Booking') }}</button>
                 </div>
             </form>
         </div>

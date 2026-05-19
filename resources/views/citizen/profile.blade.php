@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'My Profile')
-@section('page-title', 'My Profile')
+@section('title', __('My Profile'))
+@section('page-title', __('My Profile'))
 
 @section('content')
 @php
@@ -23,7 +23,12 @@
         'rejected', 'missing' => 'is-danger',
         default => 'is-warning',
     };
-    $identityLabel = $identityStatus === 'missing' ? 'No document' : ucfirst($identityStatus);
+    $identityLabel = match($identityStatus) {
+        'missing'  => __('No document'),
+        'approved' => __('Approved'),
+        'rejected' => __('Rejected'),
+        default    => __('Pending'),
+    };
 @endphp
 
 <div class="citizen-profile-grid">
@@ -32,9 +37,9 @@
             <div class="card-body">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 <div>
-                    <div class="citizen-profile-alert-title">Complete your profile to submit requests</div>
+                    <div class="citizen-profile-alert-title">{{ __('Complete your profile to submit requests') }}</div>
                     <div class="citizen-profile-alert-copy">
-                        Missing: {{ implode(', ', $missingFields) }}. Fill the fields below, then save.
+                        {{ __('Missing') }}: {{ implode(', ', $missingFields) }}. {{ __('Fill the fields below, then save.') }}
                     </div>
                 </div>
             </div>
@@ -46,12 +51,12 @@
             <div class="card-body">
                 <i class="bi bi-shield-exclamation"></i>
                 <div>
-                    <div class="citizen-profile-alert-title">Identity validation required</div>
+                    <div class="citizen-profile-alert-title">{{ __('Identity validation required') }}</div>
                     <div class="citizen-profile-alert-copy">
                         @if($user->isCitizenIdentityRejected())
-                            Your National ID document was rejected. Upload a corrected document and wait for admin approval.
+                            {{ __('Your National ID document was rejected. Upload a corrected document and wait for admin approval.') }}
                         @else
-                            Your National ID document is pending admin validation. Citizen services unlock after approval.
+                            {{ __('Your National ID document is pending admin validation. Citizen services unlock after approval.') }}
                         @endif
                     </div>
                 </div>
@@ -69,7 +74,7 @@
                         {{ strtoupper(substr($user->name, 0, 1)) }}
                     </div>
                 @endif
-                <label class="citizen-avatar-edit" for="avatar-input" title="Change photo">
+                <label class="citizen-avatar-edit" for="avatar-input" title="{{ __('Change photo') }}">
                     <i class="bi bi-camera-fill"></i>
                 </label>
                 <form id="avatar-form" action="{{ route('citizen.profile.avatar') }}" method="POST" enctype="multipart/form-data">
@@ -81,11 +86,11 @@
                 <h2 class="citizen-profile-name">{{ $user->name }}</h2>
                 <div class="citizen-profile-email">{{ $user->email }}</div>
                 <div class="citizen-profile-badges">
-                    <span class="citizen-badge is-primary"><i class="bi bi-person-check me-1"></i>Citizen Account</span>
+                    <span class="citizen-badge is-primary"><i class="bi bi-person-check me-1"></i>{{ __('Citizen Account') }}</span>
                     @if($user->phone)
                         <span class="citizen-badge"><i class="bi bi-phone me-1"></i>{{ $user->phone }}</span>
                     @endif
-                    <span class="citizen-badge"><i class="bi bi-calendar3 me-1"></i>Joined {{ $user->created_at->format('M Y') }}</span>
+                    <span class="citizen-badge"><i class="bi bi-calendar3 me-1"></i>{{ __('Joined') }} {{ $user->created_at->format('M Y') }}</span>
                 </div>
             </div>
         </div>
@@ -96,21 +101,21 @@
             <div class="card-body">
                 <div class="citizen-mini-icon is-info"><i class="bi bi-file-text"></i></div>
                 <div class="citizen-mini-value" data-citizen-counter="{{ $totalRequests }}">{{ $totalRequests }}</div>
-                <div class="citizen-mini-label">Total Requests</div>
+                <div class="citizen-mini-label">{{ __('Total Requests') }}</div>
             </div>
         </div>
         <div class="card citizen-mini-card citizen-reveal" data-citizen-reveal>
             <div class="card-body">
                 <div class="citizen-mini-icon is-success"><i class="bi bi-check-circle"></i></div>
                 <div class="citizen-mini-value" data-citizen-counter="{{ $completedRequests }}">{{ $completedRequests }}</div>
-                <div class="citizen-mini-label">Completed</div>
+                <div class="citizen-mini-label">{{ __('Completed') }}</div>
             </div>
         </div>
         <div class="card citizen-mini-card citizen-reveal" data-citizen-reveal>
             <div class="card-body">
                 <div class="citizen-mini-icon is-amber"><i class="bi bi-hourglass-split"></i></div>
                 <div class="citizen-mini-value" data-citizen-counter="{{ $pendingRequests }}">{{ $pendingRequests }}</div>
-                <div class="citizen-mini-label">In Progress</div>
+                <div class="citizen-mini-label">{{ __('In Progress') }}</div>
             </div>
         </div>
     </div>
@@ -118,7 +123,7 @@
     <div class="citizen-profile-cols">
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-person-gear me-2 text-primary"></i>Account Information</span>
+                <span class="card-title"><i class="bi bi-person-gear me-2 text-primary"></i>{{ __('Account Information') }}</span>
             </div>
             <div class="card-body">
                 <form action="{{ route('citizen.profile.update') }}" method="POST" enctype="multipart/form-data" novalidate>
@@ -127,35 +132,35 @@
 
                     <div class="citizen-form-grid">
                         <div>
-                            <label class="form-label">Full Name</label>
+                            <label class="form-label">{{ __('Full Name') }}</label>
                             <div class="citizen-input-wrap">
                                 <i class="bi bi-person citizen-input-icon"></i>
                                 <input type="text" class="form-control citizen-disabled-input" value="{{ $user->name }}" disabled>
                             </div>
-                            <div class="form-text">Name cannot be changed. Contact support if needed.</div>
+                            <div class="form-text">{{ __('Name cannot be changed. Contact support if needed.') }}</div>
                         </div>
                         <div>
-                            <label class="form-label">Email Address</label>
+                            <label class="form-label">{{ __('Email Address') }}</label>
                             <div class="citizen-input-wrap">
                                 <i class="bi bi-envelope citizen-input-icon"></i>
                                 <input type="email" class="form-control citizen-disabled-input" value="{{ $user->email }}" disabled>
                             </div>
-                            <div class="form-text">Email cannot be changed. Contact support if needed.</div>
+                            <div class="form-text">{{ __('Email cannot be changed. Contact support if needed.') }}</div>
                         </div>
                         <div>
-                            <label class="form-label">National ID Number</label>
+                            <label class="form-label">{{ __('National ID Number') }}</label>
                             <div class="citizen-input-wrap">
                                 <i class="bi bi-credit-card-2-front citizen-input-icon"></i>
-                                <input type="text" class="form-control citizen-disabled-input citizen-mono" value="{{ $user->national_id ?? 'Not set' }}" disabled>
+                                <input type="text" class="form-control citizen-disabled-input citizen-mono" value="{{ $user->national_id ?? __('Not set') }}" disabled>
                             </div>
-                            <div class="form-text">National ID cannot be changed. Contact support if needed.</div>
+                            <div class="form-text">{{ __('National ID cannot be changed. Contact support if needed.') }}</div>
                         </div>
                         <div>
-                            <label class="form-label">National ID Document</label>
+                            <label class="form-label">{{ __('National ID Document') }}</label>
                             @if($user->id_document && $user->isCitizenIdentityApproved())
                                 <div class="citizen-id-verified">
                                     <i class="bi bi-patch-check-fill"></i>
-                                    <span>ID document approved by admin</span>
+                                    <span>{{ __('ID document approved by admin') }}</span>
                                 </div>
                             @else
                                 @if($user->id_document)
@@ -163,9 +168,9 @@
                                         <i class="bi bi-{{ $user->isCitizenIdentityRejected() ? 'x-circle-fill' : 'hourglass-split' }}"></i>
                                         <span>
                                             @if($user->isCitizenIdentityRejected())
-                                                ID document rejected. Upload a corrected document.
+                                                {{ __('ID document rejected. Upload a corrected document.') }}
                                             @else
-                                                ID document uploaded. Waiting for admin validation.
+                                                {{ __('ID document uploaded. Waiting for admin validation.') }}
                                             @endif
                                         </span>
                                     </div>
@@ -173,14 +178,14 @@
                                 <label class="citizen-upload-zone" id="idUploadZone" for="national_id_doc">
                                     <input type="file" id="national_id_doc" name="national_id_document" accept=".jpg,.jpeg,.png,.pdf">
                                     <span class="citizen-upload-icon"><i class="bi bi-cloud-arrow-up"></i></span>
-                                    <span class="citizen-upload-title">{{ $user->id_document ? 'Upload replacement document' : 'Upload national ID document' }}</span>
-                                    <span class="citizen-upload-sub">JPG, PNG or PDF, max 5 MB</span>
+                                    <span class="citizen-upload-title">{{ $user->id_document ? __('Upload replacement document') : __('Upload national ID document') }}</span>
+                                    <span class="citizen-upload-sub">{{ __('JPG, PNG or PDF, max 5 MB') }}</span>
                                 </label>
                                 <div id="uploadPreview" class="citizen-upload-preview" style="display:none">
                                     <i class="bi bi-file-earmark-check"></i>
                                     <span id="uploadName"></span>
                                 </div>
-                                <div class="form-text">Select the file, then press Save Changes. Admin approval is required before using citizen services.</div>
+                                <div class="form-text">{{ __('Select the file, then press Save Changes. Admin approval is required before using citizen services.') }}</div>
                                 <div id="ocrStatus" class="citizen-ocr-status" role="status" aria-live="polite"></div>
                                 @error('national_id_document')
                                     <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
@@ -190,11 +195,11 @@
                         {{-- Phone Verification (Twilio WhatsApp OTP) --}}
                         <div>
                             <label class="form-label d-flex align-items-center gap-2">
-                                Phone Number
+                                {{ __('Phone Number') }}
                                 @if($user->phone_verified_at)
-                                    <span class="citizen-badge is-success" style="font-size:.65rem"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
+                                    <span class="citizen-badge is-success" style="font-size:.65rem"><i class="bi bi-patch-check-fill me-1"></i>{{ __('Verified') }}</span>
                                 @elseif($user->phone)
-                                    <span class="citizen-badge" style="font-size:.65rem;color:#B45309;background:#FFFBEB;border-color:#FDE68A"><i class="bi bi-exclamation-circle me-1"></i>Not verified</span>
+                                    <span class="citizen-badge" style="font-size:.65rem;color:#B45309;background:#FFFBEB;border-color:#FDE68A"><i class="bi bi-exclamation-circle me-1"></i>{{ __('Not verified') }}</span>
                                 @endif
                             </label>
 
@@ -207,36 +212,36 @@
                                                value="{{ $user->phone }}" placeholder="+96170551180">
                                     </div>
                                 <button type="button" id="fb-send-btn" class="btn btn-outline-primary btn-sm text-nowrap">
-                                        <i class="bi bi-whatsapp me-1"></i>Send via WhatsApp
+                                        <i class="bi bi-whatsapp me-1"></i>{{ __('Send via WhatsApp') }}
                                     </button>
                                 </div>
                                 <div class="form-text mb-2">
-                                    Include country code, no spaces — e.g. <code>+961XXXXXXXX</code>.
+                                    {{ __('Include country code, no spaces — e.g.') }} <code>+961XXXXXXXX</code>.
                                 </div>
 
                                 <details class="citizen-wa-optin">
                                     <summary>
-                                        <i class="bi bi-info-circle me-1"></i>First-time setup — opt in to WhatsApp
+                                        <i class="bi bi-info-circle me-1"></i>{{ __('First-time setup — opt in to WhatsApp') }}
                                     </summary>
                                     <div class="citizen-wa-optin-body">
                                         <div class="citizen-wa-optin-qr">
                                             {!! $waOptInQrSvg !!}
-                                            <div class="citizen-wa-optin-qr-cap">Scan with phone camera</div>
+                                            <div class="citizen-wa-optin-qr-cap">{{ __('Scan with phone camera') }}</div>
                                         </div>
                                         <div class="citizen-wa-optin-info">
                                             <p class="mb-2">
-                                                Before your first verification, opt in to our WhatsApp sandbox so messages can reach you.
+                                                {{ __('Before your first verification, opt in to our WhatsApp sandbox so messages can reach you.') }}
                                             </p>
                                             <ol class="mb-2 ps-3" style="font-size:.78rem">
-                                                <li>Scan the QR with your phone (or tap the button below on mobile)</li>
-                                                <li>WhatsApp opens with the message pre-filled</li>
-                                                <li>Hit <strong>Send</strong> &mdash; you'll get a confirmation reply</li>
+                                                <li>{{ __('Scan the QR with your phone (or tap the button below on mobile)') }}</li>
+                                                <li>{{ __('WhatsApp opens with the message pre-filled') }}</li>
+                                                <li>{!! __('Hit <strong>Send</strong> — you\'ll get a confirmation reply') !!}</li>
                                             </ol>
                                             <a href="{{ $waOptInUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-success">
-                                                <i class="bi bi-whatsapp me-1"></i>Open WhatsApp
+                                                <i class="bi bi-whatsapp me-1"></i>{{ __('Open WhatsApp') }}
                                             </a>
                                             <div class="citizen-wa-optin-manual">
-                                                Or manually send <code>join percent-weight</code> to <code>+1 415 523 8886</code>.
+                                                {!! __('Or manually send <code>join percent-weight</code> to <code>+1 415 523 8886</code>.') !!}
                                             </div>
                                         </div>
                                     </div>
@@ -248,47 +253,47 @@
                             <div id="fb-step-2" class="citizen-otp-box d-none">
                                 <div class="citizen-otp-info">
                                     <i class="bi bi-whatsapp"></i>
-                                    <span>Code sent on WhatsApp! Enter the 6-digit code below.</span>
+                                    <span>{{ __('Code sent on WhatsApp! Enter the 6-digit code below.') }}</span>
                                 </div>
                                 <div class="d-flex gap-2 mt-2">
                                     <input type="text" id="fb-otp-input" class="form-control citizen-otp-input"
                                            maxlength="6" placeholder="_ _ _ _ _ _" autocomplete="one-time-code" inputmode="numeric">
                                     <button type="button" id="fb-verify-btn" class="btn btn-success btn-sm text-nowrap">
-                                        <i class="bi bi-check2 me-1"></i>Verify
+                                        <i class="bi bi-check2 me-1"></i>{{ __('Verify') }}
                                     </button>
                                 </div>
                                 <div id="fb-otp-error" class="text-danger mt-1" style="font-size:.75rem;display:none"></div>
                                 <button type="button" id="fb-restart-btn" style="font-size:.73rem;color:#64748B;background:none;border:none;padding:0;margin-top:.3rem;cursor:pointer">
-                                    Wrong number? Start over
+                                    {{ __('Wrong number? Start over') }}
                                 </button>
                             </div>
 
                             {{-- Step 3: Success flash --}}
                             <div id="fb-step-3" class="citizen-id-verified d-none">
                                 <i class="bi bi-patch-check-fill"></i>
-                                <span>Phone verified! Refreshing...</span>
+                                <span>{{ __('Phone verified! Refreshing...') }}</span>
                             </div>
                         </div>
                         <div class="citizen-password-zone">
-                            <label class="form-label citizen-password-label">Change Password</label>
+                            <label class="form-label citizen-password-label">{{ __('Change Password') }}</label>
                             <div class="mb-2">
-                                <label class="form-label">Current Password</label>
-                                <input type="password" name="current_password" class="form-control" placeholder="Enter your current password" autocomplete="current-password">
+                                <label class="form-label">{{ __('Current Password') }}</label>
+                                <input type="password" name="current_password" class="form-control" placeholder="{{ __('Enter your current password') }}" autocomplete="current-password">
                                 @error('current_password')
                                     <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
                                 @enderror
                             </div>
                             <div class="citizen-password-grid">
                                 <div>
-                                    <label class="form-label">New Password</label>
-                                    <input type="password" name="password" class="form-control" placeholder="At least 8 characters" autocomplete="new-password">
+                                    <label class="form-label">{{ __('New Password') }}</label>
+                                    <input type="password" name="password" class="form-control" placeholder="{{ __('At least 8 characters') }}" autocomplete="new-password">
                                     @error('password')
                                         <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
                                     @enderror
                                 </div>
                                 <div>
-                                    <label class="form-label">Confirm New Password</label>
-                                    <input type="password" name="password_confirmation" class="form-control" placeholder="Repeat password" autocomplete="new-password">
+                                    <label class="form-label">{{ __('Confirm New Password') }}</label>
+                                    <input type="password" name="password_confirmation" class="form-control" placeholder="{{ __('Repeat password') }}" autocomplete="new-password">
                                 </div>
                             </div>
                         </div>
@@ -296,7 +301,7 @@
 
                     <div class="mt-4">
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle me-1"></i> Save Changes
+                            <i class="bi bi-check-circle me-1"></i> {{ __('Save Changes') }}
                         </button>
                     </div>
                 </form>
@@ -305,32 +310,32 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-card-text me-2 text-primary"></i>Identity Information</span>
+                <span class="card-title"><i class="bi bi-card-text me-2 text-primary"></i>{{ __('Identity Information') }}</span>
             </div>
             <div class="card-body">
                 <div class="citizen-info-row">
-                    <span class="citizen-info-label">National ID</span>
+                    <span class="citizen-info-label">{{ __('National ID') }}</span>
                     <span class="citizen-info-value citizen-mono">{{ $user->national_id ?? '-' }}</span>
                 </div>
                 <div class="citizen-info-row">
-                    <span class="citizen-info-label">Account Type</span>
-                    <span class="citizen-info-value">Citizen</span>
+                    <span class="citizen-info-label">{{ __('Account Type') }}</span>
+                    <span class="citizen-info-value">{{ __('Citizen') }}</span>
                 </div>
                 <div class="citizen-info-row">
-                    <span class="citizen-info-label">Account Status</span>
-                    <span class="citizen-badge {{ $user->is_active ? 'is-success' : 'is-muted' }}">{{ $user->is_active ? 'Active' : 'Inactive' }}</span>
+                    <span class="citizen-info-label">{{ __('Account Status') }}</span>
+                    <span class="citizen-badge {{ $user->is_active ? 'is-success' : 'is-muted' }}">{{ $user->is_active ? __('Active') : __('Inactive') }}</span>
                 </div>
                 <div class="citizen-info-row">
-                    <span class="citizen-info-label">Member Since</span>
+                    <span class="citizen-info-label">{{ __('Member Since') }}</span>
                     <span class="citizen-info-value">{{ $user->created_at->format('F d, Y') }}</span>
                 </div>
                 <div class="citizen-info-row">
-                    <span class="citizen-info-label">ID Document</span>
+                    <span class="citizen-info-label">{{ __('ID Document') }}</span>
                     <span class="citizen-badge {{ $identityBadgeClass }}"><i class="bi bi-shield-check me-1"></i>{{ $identityLabel }}</span>
                 </div>
                 @if($user->citizen_verification_notes)
                     <div class="citizen-info-row">
-                        <span class="citizen-info-label">Admin Note</span>
+                        <span class="citizen-info-label">{{ __('Admin Note') }}</span>
                         <span class="citizen-info-value">{{ $user->citizen_verification_notes }}</span>
                     </div>
                 @endif
@@ -339,7 +344,7 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-credit-card me-2 text-primary"></i>Payment History</span>
+                <span class="card-title"><i class="bi bi-credit-card me-2 text-primary"></i>{{ __('Payment History') }}</span>
             </div>
             <div class="card-body p-0">
                 @forelse($paidRequests as $pr)
@@ -356,7 +361,7 @@
                 @empty
                     <div class="citizen-panel-empty">
                         <i class="bi bi-credit-card"></i>
-                        <p>No payments yet.</p>
+                        <p>{{ __('No payments yet.') }}</p>
                     </div>
                 @endforelse
             </div>
@@ -364,8 +369,8 @@
 
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header d-flex align-items-center justify-content-between gap-2">
-                <span class="card-title"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Activity</span>
-                <a href="{{ route('citizen.requests') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                <span class="card-title"><i class="bi bi-clock-history me-2 text-primary"></i>{{ __('Recent Activity') }}</span>
+                <a href="{{ route('citizen.requests') }}" class="btn btn-sm btn-outline-primary">{{ __('View All') }}</a>
             </div>
             <div class="card-body p-0">
                 @forelse($requests as $req)
@@ -382,7 +387,7 @@
                 @empty
                     <div class="citizen-panel-empty">
                         <i class="bi bi-clock-history"></i>
-                        <p>No recent activity.</p>
+                        <p>{{ __('No recent activity.') }}</p>
                     </div>
                 @endforelse
             </div>

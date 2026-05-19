@@ -3,6 +3,9 @@
 @section('page-title', $service->name)
 
 @section('content')
+@php
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+@endphp
 <div class="citizen-service-shell citizen-reveal" data-citizen-reveal>
     <div class="card mb-3">
         <div class="citizen-service-hero">
@@ -26,7 +29,7 @@
             <div class="citizen-service-tags">
                 <div class="citizen-service-tag">
                     <i class="bi bi-clock"></i>
-                    <span>~{{ $service->estimated_duration_days }} business day(s)</span>
+                    <span>~{{ $service->estimated_duration_days }} {{ __('business day(s)') }}</span>
                 </div>
                 @if($service->category)
                     <div class="citizen-service-tag">
@@ -39,7 +42,7 @@
             @if(isset($convertedPrices) && count($convertedPrices) > 0)
                 <div class="citizen-service-converted">
                     <div class="citizen-service-converted-label">
-                        <i class="bi bi-currency-exchange"></i> Also equivalent to:
+                        <i class="bi bi-currency-exchange"></i> {{ __('Also equivalent to:') }}
                     </div>
                     <div class="citizen-service-converted-list">
                         @foreach($convertedPrices as $currency => $amount)
@@ -56,7 +59,7 @@
     @if($service->required_documents && count($service->required_documents) > 0)
         <div class="card mb-3 citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <span class="card-title"><i class="bi bi-paperclip me-2 text-primary"></i>Required Documents</span>
+                <span class="card-title"><i class="bi bi-paperclip me-2 text-primary"></i>{{ __('Required Documents') }}</span>
             </div>
             <div class="card-body">
                 <div class="citizen-service-doc-list">
@@ -68,7 +71,7 @@
                     @endforeach
                 </div>
                 <p class="citizen-service-doc-help">
-                    <i class="bi bi-info-circle"></i> Prepare these documents before submitting your request.
+                    <i class="bi bi-info-circle"></i> {{ __('Prepare these documents before submitting your request.') }}
                 </p>
             </div>
         </div>
@@ -76,7 +79,7 @@
 
     <div class="card citizen-reveal" data-citizen-reveal>
         <div class="card-header">
-            <span class="card-title"><i class="bi bi-send me-2 text-primary"></i>Submit Request</span>
+            <span class="card-title"><i class="bi bi-send me-2 text-primary"></i>{{ __('Submit Request') }}</span>
         </div>
         <div class="card-body">
             @if($errors->any())
@@ -90,23 +93,30 @@
                 </div>
             @endif
 
+            @if($citizenActionLocked)
+                <div class="alert alert-warning mb-3" style="font-size:.82rem;">
+                    <i class="bi bi-lock me-1"></i>{{ __('Finish your profile verification to unlock new request submission.') }}
+                </div>
+            @endif
+
             <form action="{{ route('citizen.requests.submit', $service) }}" method="POST" enctype="multipart/form-data" id="submitForm">
                 @csrf
 
                 <div class="mb-3">
-                    <label class="form-label">Additional Notes <span class="citizen-service-muted">(optional)</span></label>
+                    <label class="form-label">{{ __('Additional Notes') }} <span class="citizen-service-muted">({{ __('optional') }})</span></label>
                     <textarea
                         name="notes"
                         class="form-control"
                         rows="3"
-                        placeholder="Any additional information or special requirements..."
+                        @disabled($citizenActionLocked)
+                        placeholder="{{ __('Any additional information or special requirements...') }}"
                     >{{ old('notes') }}</textarea>
                 </div>
 
                 @if($service->required_documents && count($service->required_documents) > 0)
                     <div class="mb-3">
-                        <label class="form-label">Upload Required Documents <span class="citizen-service-required">*</span></label>
-                        <p class="citizen-service-upload-help">Upload clear scans or photos. Accepted: PDF, JPG, PNG (max 5MB each)</p>
+                        <label class="form-label">{{ __('Upload Required Documents') }} <span class="citizen-service-required">*</span></label>
+                        <p class="citizen-service-upload-help">{{ __('Upload clear scans or photos. Accepted: PDF, JPG, PNG (max 5MB each)') }}</p>
 
                         @foreach($service->required_documents as $i => $docName)
                             <div class="citizen-service-upload-item">
@@ -115,12 +125,13 @@
                                 </label>
                                 <div class="upload-zone-sm citizen-upload-zone" id="zone_{{ $i }}" onclick="document.getElementById('doc_{{ $i }}').click()">
                                     <i class="bi bi-cloud-upload"></i>
-                                    <div id="zone_label_{{ $i }}" class="citizen-upload-zone-label">Tap to upload {{ $docName }}</div>
+                                    <div id="zone_label_{{ $i }}" class="citizen-upload-zone-label">{{ __('Tap to upload') }} {{ $docName }}</div>
                                     <input
                                         type="file"
                                         id="doc_{{ $i }}"
                                         name="documents[]"
                                         accept=".pdf,.jpg,.jpeg,.png"
+                                        @disabled($citizenActionLocked)
                                         required
                                         onchange="handleUpload({{ $i }}, this)"
                                     >
@@ -130,35 +141,36 @@
                     </div>
                 @else
                     <div class="mb-3">
-                        <label class="form-label">Supporting Documents <span class="citizen-service-muted">(optional)</span></label>
+                        <label class="form-label">{{ __('Supporting Documents') }} <span class="citizen-service-muted">({{ __('optional') }})</span></label>
                         <div class="upload-zone-sm citizen-upload-zone" onclick="document.getElementById('docsFree').click()">
                             <i class="bi bi-cloud-upload"></i>
-                            <div id="docsFreeLabel" class="citizen-upload-zone-label">Tap to upload documents (PDF, JPG, PNG)</div>
-                            <input type="file" id="docsFree" name="documents[]" accept=".pdf,.jpg,.jpeg,.png" multiple>
+                            <div id="docsFreeLabel" class="citizen-upload-zone-label">{{ __('Tap to upload documents (PDF, JPG, PNG)') }}</div>
+                            <input type="file" id="docsFree" name="documents[]" accept=".pdf,.jpg,.jpeg,.png" multiple @disabled($citizenActionLocked)>
                         </div>
                     </div>
                 @endif
 
                 <div class="citizen-service-summary">
-                    <div class="citizen-service-summary-title">Request Summary</div>
+                    <div class="citizen-service-summary-title">{{ __('Request Summary') }}</div>
                     <div class="citizen-service-summary-row">
-                        <span>Service fee</span>
+                        <span>{{ __('Service fee') }}</span>
                         <strong>${{ number_format($service->price, 2) }}</strong>
                     </div>
                     <div class="citizen-service-summary-row">
-                        <span>Processing time</span>
-                        <strong>~{{ $service->estimated_duration_days }} day(s)</strong>
+                        <span>{{ __('Processing time') }}</span>
+                        <strong>~{{ $service->estimated_duration_days }} {{ __('day(s)') }}</strong>
                     </div>
                     <div class="citizen-service-summary-note">
-                        <i class="bi bi-info-circle"></i> Payment is collected after your request is approved.
+                        <i class="bi bi-info-circle"></i> {{ __('Payment is collected after your request is approved.') }}
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100 citizen-submit-btn" id="submitBtn">
-                    <i class="bi bi-send-fill me-1"></i> Submit Request
+                <button type="submit" class="btn btn-primary w-100 citizen-submit-btn" id="submitBtn" @disabled($citizenActionLocked)>
+                    <i class="bi {{ $citizenActionLocked ? 'bi-lock' : 'bi-send-fill' }} me-1"></i>
+                    {{ $citizenActionLocked ? __('Profile Verification Required') : __('Submit Request') }}
                 </button>
                 <a href="{{ route('citizen.offices.show', $service->office) }}" class="btn btn-outline-secondary w-100 mt-2">
-                    <i class="bi bi-arrow-left me-1"></i> Back to Office
+                    <i class="bi bi-arrow-left me-1"></i> {{ __('Back to Office') }}
                 </a>
             </form>
         </div>

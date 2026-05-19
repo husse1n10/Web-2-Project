@@ -14,12 +14,9 @@ Route::get('/', function () {
         return view('welcome');
     }
 
-    if (auth()->user()->role === 'citizen' && !auth()->user()->hasCompletedCitizenProfile()) {
-        return redirect()->route('citizen.profile');
-    }
-
-    if (auth()->user()->role === 'citizen' && !auth()->user()->hasVerifiedCitizenIdentity()) {
-        return redirect()->route('citizen.profile');
+    if (auth()->user()->role === 'citizen' && ($message = auth()->user()->citizenActionRestrictionMessage())) {
+        return redirect()->route('citizen.dashboard')
+            ->with(auth()->user()->hasCompletedCitizenProfile() ? 'warning' : 'info', $message);
     }
 
     return match (auth()->user()->role) {
@@ -168,12 +165,8 @@ Route::middleware(['auth', 'role:office_user'])->prefix('office')->name('office.
 // ── Citizen ───────────────────────────────────────────────────────────────────
 
 Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')->group(function () {
-    Route::get('/dashboard', [CitizenController::class, 'dashboard'])
-        ->middleware('citizen.identity.approved')
-        ->name('dashboard');
-    Route::get('/requests/{serviceRequest}/messages', [CitizenController::class, 'getMessages'])
-        ->middleware('citizen.identity.approved')
-        ->name('messages.get');
+    Route::get('/dashboard', [CitizenController::class, 'dashboard'])->name('dashboard');
+    Route::get('/requests/{serviceRequest}/messages', [CitizenController::class, 'getMessages'])->name('messages.get');
 
     // Profile
     Route::get('/profile',  [CitizenController::class, 'profile'])->name('profile');
@@ -188,61 +181,61 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
     Route::post('/profile/id-extract', [AuthController::class, 'extractNationalIdDocument'])->name('profile.id-extract');
 
     // Browse
-    Route::get('/offices',          [CitizenController::class, 'browseOffices'])->middleware('citizen.identity.approved')->name('offices');
-    Route::get('/offices/{office}', [CitizenController::class, 'showOffice'])->middleware('citizen.identity.approved')->name('offices.show');
-    Route::get('/offices/{office}/slots', [CitizenController::class, 'availableSlots'])
-        ->middleware('citizen.identity.approved')
-        ->name('offices.slots');
-    Route::get('/services/{service}', [CitizenController::class, 'showService'])->middleware('citizen.identity.approved')->name('services.show');
+    Route::get('/offices',          [CitizenController::class, 'browseOffices'])->name('offices');
+    Route::get('/offices/{office}', [CitizenController::class, 'showOffice'])->name('offices.show');
+    Route::get('/offices/{office}/slots', [CitizenController::class, 'availableSlots'])->name('offices.slots');
+    Route::get('/services/{service}', [CitizenController::class, 'showService'])->name('services.show');
 
     Route::middleware(['citizen.identity.approved', 'citizen.profile.complete'])->group(function () {
         // Submit request
         Route::post('/services/{service}/request', [CitizenController::class, 'submitRequest'])->name('requests.submit');
 
         // Payment
-        Route::get('/requests/{serviceRequest}/payment',  [CitizenController::class, 'showPayment'])->name('payment');
         Route::post('/requests/{serviceRequest}/payment', [CitizenController::class, 'processPayment'])->name('payment.process');
-        Route::get('/requests/{serviceRequest}/payment/success',  [CitizenController::class, 'paymentSuccess'])->name('payment.success');
-        Route::get('/requests/{serviceRequest}/payment/cancel',   [CitizenController::class, 'paymentCancel'])->name('payment.cancel');
-
-        // Resubmit after missing documents / rejection
-        Route::post('/requests/{serviceRequest}/resubmit', [CitizenController::class, 'resubmitDocuments'])->name('requests.resubmit');
 
         // Appointments
         Route::post('/appointments', [CitizenController::class, 'bookAppointment'])->name('appointments.book');
-        Route::patch('/appointments/{appointment}/cancel', [CitizenController::class, 'cancelAppointment'])->name('appointments.cancel');
-
-        // Feedback
-        Route::post('/feedback', [CitizenController::class, 'submitFeedback'])->name('feedback.submit');
-        Route::post('/requests/{serviceRequest}/messages/read', [CitizenController::class, 'markMessagesRead'])->name('messages.read');
     });
 
+    // Payment
+    Route::get('/requests/{serviceRequest}/payment',  [CitizenController::class, 'showPayment'])->name('payment');
+    Route::get('/requests/{serviceRequest}/payment/success',  [CitizenController::class, 'paymentSuccess'])->name('payment.success');
+    Route::get('/requests/{serviceRequest}/payment/cancel',   [CitizenController::class, 'paymentCancel'])->name('payment.cancel');
+
+    // Resubmit after missing documents / rejection
+    Route::post('/requests/{serviceRequest}/resubmit', [CitizenController::class, 'resubmitDocuments'])->name('requests.resubmit');
+
+    // Appointments follow-up
+    Route::patch('/appointments/{appointment}/cancel', [CitizenController::class, 'cancelAppointment'])->name('appointments.cancel');
+
+    // Feedback
+    Route::post('/feedback', [CitizenController::class, 'submitFeedback'])->name('feedback.submit');
+    Route::post('/requests/{serviceRequest}/messages/read', [CitizenController::class, 'markMessagesRead'])->name('messages.read');
+
     // My requests
-    Route::get('/requests',                   [CitizenController::class, 'myRequests'])->middleware('citizen.identity.approved')->name('requests');
-    Route::get('/requests/{serviceRequest}',  [CitizenController::class, 'showRequest'])->middleware('citizen.identity.approved')->name('requests.show');
+    Route::get('/requests',                   [CitizenController::class, 'myRequests'])->name('requests');
+    Route::get('/requests/{serviceRequest}',  [CitizenController::class, 'showRequest'])->name('requests.show');
 
     // Appointments & Payments (dedicated pages)
-    Route::get('/appointments', [CitizenController::class, 'myAppointments'])->middleware('citizen.identity.approved')->name('appointments');
-    Route::get('/payments',     [CitizenController::class, 'myPayments'])->middleware('citizen.identity.approved')->name('payments');
+    Route::get('/appointments', [CitizenController::class, 'myAppointments'])->name('appointments');
+    Route::get('/payments',     [CitizenController::class, 'myPayments'])->name('payments');
 
     // Messages
-    Route::post('/requests/{serviceRequest}/messages', [CitizenController::class, 'sendMessage'])->middleware('citizen.identity.approved')->name('messages.send');
+    Route::post('/requests/{serviceRequest}/messages', [CitizenController::class, 'sendMessage'])->name('messages.send');
 
     // Documents
-    Route::get('/requests/{serviceRequest}/documents/{docId}', [CitizenController::class, 'downloadDocument'])->middleware('citizen.identity.approved')->name('documents.download');
+    Route::get('/requests/{serviceRequest}/documents/{docId}', [CitizenController::class, 'downloadDocument'])->name('documents.download');
 
     // PDF receipt download
-    Route::get('/requests/{serviceRequest}/receipt', [CitizenController::class, 'downloadReceipt'])->middleware('citizen.identity.approved')->name('requests.receipt');
+    Route::get('/requests/{serviceRequest}/receipt', [CitizenController::class, 'downloadReceipt'])->name('requests.receipt');
 
     // AI chatbot — 30 req/min per citizen
-    Route::post('/chatbot', [CitizenController::class, 'chatbotAsk'])
-        ->middleware(['citizen.identity.approved', 'throttle:30,1'])
-        ->name('chatbot.ask');
+    Route::post('/chatbot', [CitizenController::class, 'chatbotAsk'])->middleware('throttle:30,1')->name('chatbot.ask');
 
     // Support tickets
-    Route::get('/support',                  [CitizenController::class, 'supportIndex'])->middleware('citizen.identity.approved')->name('support');
-    Route::get('/support/create',           [CitizenController::class, 'supportCreate'])->middleware('citizen.identity.approved')->name('support.create');
-    Route::post('/support',                 [CitizenController::class, 'supportStore'])->middleware('citizen.identity.approved')->name('support.store');
-    Route::get('/support/{ticket}',         [CitizenController::class, 'supportShow'])->middleware('citizen.identity.approved')->name('support.show');
-    Route::post('/support/{ticket}/reply',  [CitizenController::class, 'supportReply'])->middleware('citizen.identity.approved')->name('support.reply');
+    Route::get('/support',                  [CitizenController::class, 'supportIndex'])->name('support');
+    Route::get('/support/create',           [CitizenController::class, 'supportCreate'])->name('support.create');
+    Route::post('/support',                 [CitizenController::class, 'supportStore'])->name('support.store');
+    Route::get('/support/{ticket}',         [CitizenController::class, 'supportShow'])->name('support.show');
+    Route::post('/support/{ticket}/reply',  [CitizenController::class, 'supportReply'])->name('support.reply');
 });

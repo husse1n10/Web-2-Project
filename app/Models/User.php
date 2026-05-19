@@ -42,6 +42,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isOfficeUser(): bool { return $this->role === 'office_user'; }
     public function isCitizen(): bool    { return $this->role === 'citizen'; }
 
+    public function canUseCitizenSelfServiceActions(): bool
+    {
+        return !$this->isCitizen()
+            || ($this->hasCompletedCitizenProfile() && $this->hasVerifiedCitizenIdentity());
+    }
+
     public function hasCompletedCitizenProfile(): bool
     {
         if (!$this->isCitizen()) {
@@ -90,6 +96,28 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isCitizenIdentityRejected(): bool
     {
         return $this->isCitizen() && $this->citizen_verification_status === 'rejected';
+    }
+
+    public function citizenActionRestrictionMessage(): ?string
+    {
+        if (!$this->isCitizen() || $this->canUseCitizenSelfServiceActions()) {
+            return null;
+        }
+
+        if (!$this->hasCompletedCitizenProfile()) {
+            $missingFields = $this->missingCitizenProfileFields();
+            $message = 'Complete your profile to unlock new requests, payments, and appointment booking.';
+
+            if (!empty($missingFields)) {
+                $message .= ' Missing: ' . implode(', ', $missingFields) . '.';
+            }
+
+            return $message;
+        }
+
+        return $this->isCitizenIdentityRejected()
+            ? 'Your National ID document was rejected. Upload a corrected document to unlock new requests, payments, and appointment booking again.'
+            : 'Your National ID document is pending admin validation. You can still browse the portal and manage existing items, but new requests, payments, and appointment booking stay locked until approval.';
     }
 
     // ── Relationships ─────────────────────────────────────────────

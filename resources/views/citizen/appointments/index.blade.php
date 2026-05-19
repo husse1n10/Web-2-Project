@@ -1,13 +1,16 @@
 @extends('layouts.app')
-@section('title', 'My Appointments')
-@section('page-title', 'My Appointments')
+@section('title', __('My Appointments'))
+@section('page-title', __('My Appointments'))
 
 @section('content')
+@php
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+@endphp
 <div class="card citizen-reveal" data-citizen-reveal>
     <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
         <div>
-            <span class="card-title">My Appointments</span>
-            <div class="citizen-appt-subtitle">Scheduled visits and timings for your service requests</div>
+            <span class="card-title">{{ __('My Appointments') }}</span>
+            <div class="citizen-appt-subtitle">{{ __('Scheduled visits and timings for your service requests') }}</div>
         </div>
     </div>
 
@@ -15,8 +18,8 @@
         <div class="citizen-appt-request-panel">
             <div class="citizen-appt-request-head">
                 <div>
-                    <div class="citizen-appt-request-title">Requests Needing Appointments</div>
-                    <div class="citizen-appt-subtitle">Book a visit for requests that do not have an active appointment.</div>
+                    <div class="citizen-appt-request-title">{{ __('Requests Needing Appointments') }}</div>
+                    <div class="citizen-appt-subtitle">{{ __('Book a visit for requests that do not have an active appointment.') }}</div>
                 </div>
                 <span class="citizen-appt-count">{{ $requestsNeedingAppointments->count() }}</span>
             </div>
@@ -32,17 +35,18 @@
                         <x-status-pill :status="$requestItem->status" />
                         <div class="citizen-appt-request-actions">
                             <a href="{{ route('citizen.requests.show', $requestItem) }}" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-eye me-1"></i> View
+                                <i class="bi bi-eye me-1"></i> {{ __('View') }}
                             </a>
                             <button
                                 type="button"
                                 class="btn btn-sm btn-primary"
+                                @disabled($citizenActionLocked)
                                 data-book-appointment
                                 data-office-id="{{ $requestItem->office_id }}"
                                 data-request-id="{{ $requestItem->id }}"
                                 data-request-label="{{ $requestItem->service->name }} - {{ $requestItem->reference_number }}"
                             >
-                                <i class="bi bi-calendar-plus me-1"></i> Book
+                                <i class="bi {{ $citizenActionLocked ? 'bi-lock' : 'bi-calendar-plus' }} me-1"></i> {{ $citizenActionLocked ? __('Profile Verification Required') : __('Book') }}
                             </button>
                         </div>
                     </div>
@@ -57,13 +61,13 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Office</th>
-                        <th>Service</th>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                        <th>Notes</th>
-                        <th class="text-end">Action</th>
+                        <th>{{ __('Office') }}</th>
+                        <th>{{ __('Service') }}</th>
+                        <th>{{ __('Date') }}</th>
+                        <th>{{ __('Time') }}</th>
+                        <th>{{ __('Status') }}</th>
+                        <th>{{ __('Notes') }}</th>
+                        <th class="text-end">{{ __('Action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,15 +93,15 @@
                                 <div class="d-inline-flex gap-1">
                                     @if($appt->request)
                                         <a href="{{ route('citizen.requests.show', $appt->request) }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-eye me-1"></i> View Request
+                                            <i class="bi bi-eye me-1"></i> {{ __('View Request') }}
                                         </a>
                                     @endif
                                     @if(!in_array($appt->status, ['cancelled', 'completed'], true))
-                                        <form action="{{ route('citizen.appointments.cancel', $appt) }}" method="POST" onsubmit="return confirm('Cancel this appointment? This cannot be undone.');">
+                                        <form action="{{ route('citizen.appointments.cancel', $appt) }}" method="POST" onsubmit="return confirm('{{ __('Cancel this appointment? This cannot be undone.') }}');">
                                             @csrf
                                             @method('PATCH')
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="bi bi-x-circle me-1"></i> Cancel
+                                                <i class="bi bi-x-circle me-1"></i> {{ __('Cancel') }}
                                             </button>
                                         </form>
                                     @endif
@@ -109,10 +113,10 @@
                             <td colspan="7" class="py-4">
                                 <x-empty-state
                                     icon="bi-calendar-x"
-                                    title="No appointments yet"
-                                    message="{{ $requestsNeedingAppointments->isNotEmpty() ? 'Use the requests above to book your first appointment.' : 'Submit a service request first, then book an appointment from here.' }}"
+                                    :title="__('No appointments yet')"
+                                    :message="$requestsNeedingAppointments->isNotEmpty() ? __('Use the requests above to book your first appointment.') : __('Submit a service request first, then book an appointment from here.')"
                                     :action-url="$requestsNeedingAppointments->isEmpty() ? route('citizen.offices') : null"
-                                    action-label="Browse Services"
+                                    :action-label="__('Browse Services')"
                                     class="py-2"
                                 />
                             </td>
@@ -187,20 +191,20 @@
                 <div class="modal-body pt-2">
                     <div class="mb-3">
                         <label class="form-label">Preferred Date</label>
-                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required>
+                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required @disabled($citizenActionLocked)>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Preferred Time</label>
-                        <input type="time" name="appointment_time" class="form-control" required>
+                        <input type="time" name="appointment_time" class="form-control" required @disabled($citizenActionLocked)>
                     </div>
                     <div>
                         <label class="form-label">Notes (optional)</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="Any specific notes..."></textarea>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Any specific notes..." @disabled($citizenActionLocked)></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Confirm Booking</button>
+                    <button type="submit" class="btn btn-primary btn-sm" @disabled($citizenActionLocked)>{{ $citizenActionLocked ? __('Profile Verification Required') : __('Confirm Booking') }}</button>
                 </div>
             </form>
         </div>

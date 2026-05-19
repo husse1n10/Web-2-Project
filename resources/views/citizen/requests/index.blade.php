@@ -1,16 +1,16 @@
 @extends('layouts.app')
-@section('title', 'My Requests')
-@section('page-title', 'My Requests')
+@section('title', __('My Requests'))
+@section('page-title', __('My Requests'))
 
 @section('content')
 @php
     $allRequests = auth()->user()->serviceRequests;
     $statusGroups = [
-        ['key' => null, 'label' => 'All'],
-        ['key' => 'pending', 'label' => 'Pending'],
-        ['key' => 'in_review', 'label' => 'In Review'],
-        ['key' => 'approved', 'label' => 'Approved'],
-        ['key' => 'completed', 'label' => 'Done'],
+        ['key' => null, 'label' => __('All')],
+        ['key' => 'pending', 'label' => __('Pending')],
+        ['key' => 'in_review', 'label' => __('In Review')],
+        ['key' => 'approved', 'label' => __('Approved')],
+        ['key' => 'completed', 'label' => __('Done')],
     ];
 
     $baseFilterParams = request()->except(['status', 'page']);
@@ -25,28 +25,28 @@
                     type="text"
                     name="search"
                     class="form-control citizen-filter-input"
-                    placeholder="Search by reference, service, or office..."
+                    placeholder="{{ __('Search by reference, service, or office...') }}"
                     value="{{ request('search') }}"
                 >
             </div>
             <select name="status" class="form-select citizen-filter-select">
-                <option value="">All Statuses</option>
+                <option value="">{{ __('All Statuses') }}</option>
                 @foreach(['pending','in_review','missing_documents','approved','rejected','completed'] as $status)
                     <option value="{{ $status }}" {{ request('status') === $status ? 'selected' : '' }}>
-                        {{ ucfirst(str_replace('_', ' ', $status)) }}
+                        {{ __(ucfirst(str_replace('_', ' ', $status))) }}
                     </option>
                 @endforeach
             </select>
             <select name="payment_status" class="form-select citizen-filter-select">
-                <option value="">All Payments</option>
-                <option value="paid" {{ request('payment_status') === 'paid' ? 'selected' : '' }}>Paid</option>
-                <option value="unpaid" {{ request('payment_status') === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+                <option value="">{{ __('All Payments') }}</option>
+                <option value="paid" {{ request('payment_status') === 'paid' ? 'selected' : '' }}>{{ __('Paid') }}</option>
+                <option value="unpaid" {{ request('payment_status') === 'unpaid' ? 'selected' : '' }}>{{ __('Unpaid') }}</option>
             </select>
             <button type="submit" class="btn btn-primary citizen-filter-btn">
-                <i class="bi bi-funnel me-1"></i> Filter
+                <i class="bi bi-funnel me-1"></i> {{ __('Filter') }}
             </button>
             @if(request()->hasAny(['search', 'status', 'payment_status']))
-                <a href="{{ route('citizen.requests') }}" class="btn btn-outline-secondary citizen-filter-btn">Clear</a>
+                <a href="{{ route('citizen.requests') }}" class="btn btn-outline-secondary citizen-filter-btn">{{ __('Clear') }}</a>
             @endif
         </form>
     </div>
@@ -71,11 +71,11 @@
 <div class="card citizen-reveal" data-citizen-reveal>
     <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
         <div>
-            <span class="card-title">All Requests</span>
-            <div class="citizen-request-subtitle">Track progress, payments, and submission details</div>
+            <span class="card-title">{{ __('All Requests') }}</span>
+            <div class="citizen-request-subtitle">{{ __('Track progress, payments, and submission details') }}</div>
         </div>
         <a href="{{ route('citizen.offices') }}" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg me-1"></i> New Request
+            <i class="bi bi-plus-lg me-1"></i> {{ __('New Request') }}
         </a>
     </div>
 
@@ -84,14 +84,14 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Reference</th>
-                        <th>Service</th>
-                        <th>Office</th>
-                        <th>Status</th>
-                        <th>Payment</th>
-                        <th>Date</th>
-                        <th>Chat</th>
-                        <th class="text-end">Action</th>
+                        <th>{{ __('Reference') }}</th>
+                        <th>{{ __('Service') }}</th>
+                        <th>{{ __('Office') }}</th>
+                        <th>{{ __('Status') }}</th>
+                        <th>{{ __('Payment') }}</th>
+                        <th>{{ __('Date') }}</th>
+                        <th>{{ __('Chat') }}</th>
+                        <th class="text-end">{{ __('Action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -105,14 +105,14 @@
                             <td class="citizen-request-date">{{ $req->created_at->format('M d, Y') }}</td>
                             <td>
                                 @if(($req->unread_messages_count ?? 0) > 0)
-                                    <span class="badge bg-danger">{{ $req->unread_messages_count }} unread</span>
+                                    <span class="badge bg-danger">{{ $req->unread_messages_count }} {{ __('unread') }}</span>
                                 @else
-                                    <span class="text-muted" style="font-size:.75rem">No new</span>
+                                    <span class="text-muted" style="font-size:.75rem">{{ __('No new') }}</span>
                                 @endif
                             </td>
                             <td class="text-end">
                                 <a href="{{ route('citizen.requests.show', $req) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-eye me-1"></i> View
+                                    <i class="bi bi-eye me-1"></i> {{ __('View') }}
                                 </a>
                             </td>
                         </tr>
@@ -121,10 +121,10 @@
                             <td colspan="8" class="citizen-requests-empty-cell">
                                 <x-empty-state
                                     icon="bi-inbox"
-                                    title="No requests found"
-                                    message="Try changing filters or submit your first request."
+                                    :title="__('No requests found')"
+                                    :message="__('Try changing filters or submit your first request.')"
                                     :action-url="route('citizen.offices')"
-                                    action-label="Browse Services"
+                                    :action-label="__('Browse Services')"
                                     class="py-2"
                                 />
                             </td>
@@ -161,10 +161,10 @@
             <div class="citizen-requests-empty-mobile">
                 <x-empty-state
                     icon="bi-inbox"
-                    title="No requests yet"
-                    message="Start by browsing available municipal services."
+                    :title="__('No requests yet')"
+                    :message="__('Start by browsing available municipal services.')"
                     :action-url="route('citizen.offices')"
-                    action-label="Browse Services"
+                    :action-label="__('Browse Services')"
                 />
             </div>
         @endforelse

@@ -3,6 +3,9 @@
 @section('page-title', 'Complete Payment')
 
 @section('content')
+@php
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+@endphp
 <div class="citizen-payment-shell citizen-reveal" data-citizen-reveal>
     <div class="card mb-3">
         <div class="card-body">
@@ -32,6 +35,12 @@
         </div>
     @endif
 
+    @if($citizenActionLocked)
+        <div class="alert alert-warning mb-3">
+            <i class="bi bi-lock me-1"></i>{{ __('Finish your profile verification to unlock payments.') }}
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-header">
             <span class="card-title">Select Payment Method</span>
@@ -42,7 +51,7 @@
 
                 <div class="citizen-payment-method-grid">
                     <label class="citizen-payment-method-item">
-                        <input type="radio" name="payment_method" value="card" class="pm-radio" required>
+                        <input type="radio" name="payment_method" value="card" class="pm-radio" required @disabled($citizenActionLocked)>
                         <span class="pm-option" data-method="card">
                             <i class="bi bi-credit-card-2-front"></i>
                             <span class="pm-option-title">Card</span>
@@ -50,7 +59,7 @@
                         </span>
                     </label>
                     <label class="citizen-payment-method-item">
-                        <input type="radio" name="payment_method" value="crypto" class="pm-radio">
+                        <input type="radio" name="payment_method" value="crypto" class="pm-radio" @disabled($citizenActionLocked)>
                         <span class="pm-option" data-method="crypto">
                             <i class="bi bi-currency-bitcoin"></i>
                             <span class="pm-option-title">Crypto</span>
@@ -69,7 +78,7 @@
                 <div id="cryptoFields" class="citizen-payment-fieldset" hidden>
                     <div class="mb-3">
                         <label class="form-label">Select Cryptocurrency</label>
-                        <select name="crypto_currency" class="form-select">
+                        <select name="crypto_currency" class="form-select" @disabled($citizenActionLocked)>
                             <option value="BTC">Bitcoin (BTC)</option>
                             <option value="ETH">Ethereum (ETH)</option>
                             <option value="USDT">Tether USDT</option>
@@ -81,8 +90,9 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100 mt-3 citizen-pay-submit" id="payBtn">
-                    <i class="bi bi-lock-fill me-1"></i> Pay Securely
+                <button type="submit" class="btn btn-primary w-100 mt-3 citizen-pay-submit" id="payBtn" @disabled($citizenActionLocked)>
+                    <i class="bi {{ $citizenActionLocked ? 'bi-lock-fill' : 'bi-shield-check' }} me-1"></i>
+                    {{ $citizenActionLocked ? __('Profile Verification Required') : __('Pay Securely') }}
                 </button>
             </form>
 

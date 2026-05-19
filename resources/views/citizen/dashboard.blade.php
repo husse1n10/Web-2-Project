@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'Citizen Dashboard')
-@section('page-title', 'Citizen Dashboard')
+@section('title', __('Citizen Dashboard'))
+@section('page-title', __('Citizen Dashboard'))
 
 @section('content')
 @php
@@ -36,18 +36,18 @@
     <div class="card-body">
         <div class="row g-4 align-items-center">
             <div class="col-12 col-xl-8">
-                <span class="citizen-hero-eyebrow">Citizen Workspace</span>
-                <h2 class="citizen-hero-title">Welcome back, {{ \Illuminate\Support\Str::before($user->name, ' ') }}.</h2>
+                <span class="citizen-hero-eyebrow">{{ __('Citizen Workspace') }}</span>
+                <h2 class="citizen-hero-title">{{ __('Welcome back,') }} {{ \Illuminate\Support\Str::before($user->name, ' ') }}.</h2>
                 <p class="citizen-hero-copy">
-                    Track requests, complete pending actions, and keep your profile ready so submissions stay fast.
+                    {{ __('Track requests, complete pending actions, and keep your profile ready so submissions stay fast.') }}
                 </p>
 
                 <div class="citizen-progress-wrap">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="citizen-progress-label">Request completion progress</span>
+                        <span class="citizen-progress-label">{{ __('Request completion progress') }}</span>
                         <span class="citizen-progress-value">{{ $completionRate }}%</span>
                     </div>
-                    <div class="progress citizen-progress-bar" role="progressbar" aria-label="Request completion progress" aria-valuenow="{{ $completionRate }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress citizen-progress-bar" role="progressbar" aria-label="{{ __('Request completion progress') }}" aria-valuenow="{{ $completionRate }}" aria-valuemin="0" aria-valuemax="100">
                         <div class="progress-bar" style="width: {{ $completionRate }}%"></div>
                     </div>
                 </div>
@@ -55,12 +55,12 @@
                 @if(!empty($missingFields))
                     <div class="citizen-inline-alert mt-3">
                         <i class="bi bi-exclamation-circle"></i>
-                        <span>Profile incomplete: {{ implode(', ', $missingFields) }}</span>
+                        <span>{{ __('Profile incomplete:') }} {{ implode(', ', $missingFields) }}</span>
                     </div>
                 @else
                     <div class="citizen-inline-alert is-success mt-3">
                         <i class="bi bi-check2-circle"></i>
-                        <span>Your profile is complete and ready for new requests.</span>
+                        <span>{{ __('Your profile is complete and ready for new requests.') }}</span>
                     </div>
                 @endif
             </div>
@@ -69,12 +69,12 @@
                     <div class="citizen-hero-orb citizen-hero-orb-one"></div>
                     <div class="citizen-hero-orb citizen-hero-orb-two"></div>
                     <div class="citizen-hero-meta">
-                        <div class="citizen-hero-meta-label">Profile readiness</div>
+                        <div class="citizen-hero-meta-label">{{ __('Profile readiness') }}</div>
                         <div class="citizen-hero-meta-value" data-citizen-counter="{{ $profileCompletion }}">{{ $profileCompletion }}</div>
-                        <div class="citizen-hero-meta-suffix">% complete</div>
+                        <div class="citizen-hero-meta-suffix">% {{ __('complete') }}</div>
                     </div>
                     <a href="{{ route('citizen.profile') }}" class="btn btn-primary w-100 mt-3">
-                        <i class="bi bi-person-check me-1"></i> Update Profile
+                        <i class="bi bi-person-check me-1"></i> {{ __('Update Profile') }}
                     </a>
                 </div>
             </div>
@@ -88,12 +88,12 @@
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between">
                     <div>
-                        <span class="citizen-kpi-label">Active</span>
+                        <span class="citizen-kpi-label">{{ __('Active') }}</span>
                         <h3 class="citizen-kpi-value" data-citizen-counter="{{ $activeRequests->count() }}">{{ $activeRequests->count() }}</h3>
                     </div>
                     <span class="stat-card-icon bg-teal"><i class="bi bi-activity"></i></span>
                 </div>
-                <div class="citizen-kpi-sub">Currently in progress</div>
+                <div class="citizen-kpi-sub">{{ __('Currently in progress') }}</div>
             </div>
         </div>
     </div>
@@ -102,12 +102,12 @@
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between">
                     <div>
-                        <span class="citizen-kpi-label">Pending</span>
+                        <span class="citizen-kpi-label">{{ __('Pending') }}</span>
                         <h3 class="citizen-kpi-value" data-citizen-counter="{{ $allRequests->where('status', 'pending')->count() }}">{{ $allRequests->where('status', 'pending')->count() }}</h3>
                     </div>
                     <span class="stat-card-icon bg-amber"><i class="bi bi-hourglass-split"></i></span>
                 </div>
-                <div class="citizen-kpi-sub">Waiting to be reviewed</div>
+                <div class="citizen-kpi-sub">{{ __('Waiting to be reviewed') }}</div>
             </div>
         </div>
     </div>
@@ -116,12 +116,12 @@
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between">
                     <div>
-                        <span class="citizen-kpi-label">Completed</span>
+                        <span class="citizen-kpi-label">{{ __('Completed') }}</span>
                         <h3 class="citizen-kpi-value" data-citizen-counter="{{ $completedCount }}">{{ $completedCount }}</h3>
                     </div>
                     <span class="stat-card-icon bg-emerald"><i class="bi bi-check-circle"></i></span>
                 </div>
-                <div class="citizen-kpi-sub">Finished successfully</div>
+                <div class="citizen-kpi-sub">{{ __('Finished successfully') }}</div>
             </div>
         </div>
     </div>
@@ -130,12 +130,12 @@
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between">
                     <div>
-                        <span class="citizen-kpi-label">Unpaid</span>
+                        <span class="citizen-kpi-label">{{ __('Unpaid') }}</span>
                         <h3 class="citizen-kpi-value" data-citizen-counter="{{ $allRequests->where('payment_status', '!=', 'paid')->count() }}">{{ $allRequests->where('payment_status', '!=', 'paid')->count() }}</h3>
                     </div>
                     <span class="stat-card-icon bg-rose"><i class="bi bi-credit-card"></i></span>
                 </div>
-                <div class="citizen-kpi-sub">Need payment action</div>
+                <div class="citizen-kpi-sub">{{ __('Need payment action') }}</div>
             </div>
         </div>
     </div>
@@ -149,29 +149,29 @@
                     <a href="{{ route('citizen.offices') }}" class="citizen-action-link">
                         <span class="citizen-action-icon"><i class="bi bi-search"></i></span>
                         <span>
-                            <span class="citizen-action-title">Browse Services</span>
-                            <span class="citizen-action-sub">Find office services near you</span>
+                            <span class="citizen-action-title">{{ __('Browse Services') }}</span>
+                            <span class="citizen-action-sub">{{ __('Find office services near you') }}</span>
                         </span>
                     </a>
                     <a href="{{ route('citizen.requests') }}" class="citizen-action-link">
                         <span class="citizen-action-icon"><i class="bi bi-file-earmark-text"></i></span>
                         <span>
-                            <span class="citizen-action-title">My Requests</span>
-                            <span class="citizen-action-sub">Track and manage submissions</span>
+                            <span class="citizen-action-title">{{ __('My Requests') }}</span>
+                            <span class="citizen-action-sub">{{ __('Track and manage submissions') }}</span>
                         </span>
                     </a>
                     <a href="{{ route('citizen.requests') }}?payment_status=unpaid" class="citizen-action-link">
                         <span class="citizen-action-icon"><i class="bi bi-credit-card-2-front"></i></span>
                         <span>
-                            <span class="citizen-action-title">Complete Payments</span>
-                            <span class="citizen-action-sub">Resolve unpaid requests quickly</span>
+                            <span class="citizen-action-title">{{ __('Complete Payments') }}</span>
+                            <span class="citizen-action-sub">{{ __('Resolve unpaid requests quickly') }}</span>
                         </span>
                     </a>
                     <a href="{{ route('citizen.profile') }}" class="citizen-action-link">
                         <span class="citizen-action-icon"><i class="bi bi-person-vcard"></i></span>
                         <span>
-                            <span class="citizen-action-title">Profile</span>
-                            <span class="citizen-action-sub">Keep your account up to date</span>
+                            <span class="citizen-action-title">{{ __('Profile') }}</span>
+                            <span class="citizen-action-sub">{{ __('Keep your account up to date') }}</span>
                         </span>
                     </a>
                 </div>
@@ -185,11 +185,11 @@
         <div class="card h-100 citizen-reveal" data-citizen-reveal>
             <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>
-                    <h6 class="card-title">Active Requests</h6>
-                    <small class="text-muted">Most recent requests with current status</small>
+                    <h6 class="card-title">{{ __('Active Requests') }}</h6>
+                    <small class="text-muted">{{ __('Most recent requests with current status') }}</small>
                 </div>
                 @if($requests->count() > 8)
-                    <a href="{{ route('citizen.requests') }}" class="btn btn-sm btn-outline-primary">View all</a>
+                    <a href="{{ route('citizen.requests') }}" class="btn btn-sm btn-outline-primary">{{ __('View all') }}</a>
                 @endif
             </div>
             <div class="card-body p-0">
@@ -198,12 +198,12 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>Reference</th>
-                                    <th>Service</th>
-                                    <th>Office</th>
-                                    <th>Status</th>
-                                    <th>Payment</th>
-                                    <th class="text-end">Action</th>
+                                    <th>{{ __('Reference') }}</th>
+                                    <th>{{ __('Service') }}</th>
+                                    <th>{{ __('Office') }}</th>
+                                    <th>{{ __('Status') }}</th>
+                                    <th>{{ __('Payment') }}</th>
+                                    <th class="text-end">{{ __('Action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -215,7 +215,7 @@
                                         <td><x-status-pill :status="$request->status" /></td>
                                         <td><x-status-pill :status="$request->payment_status" /></td>
                                         <td class="text-end">
-                                            <a href="{{ route('citizen.requests.show', $request) }}" class="btn btn-sm btn-outline-primary">Open</a>
+                                            <a href="{{ route('citizen.requests.show', $request) }}" class="btn btn-sm btn-outline-primary">{{ __('Open') }}</a>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -225,9 +225,9 @@
                 @else
                     <div class="p-4 text-center citizen-empty">
                         <div class="mb-2"><i class="bi bi-inbox"></i></div>
-                        <div class="fw-semibold mb-1">No service requests yet</div>
-                        <div class="text-muted mb-3">Start by browsing available municipality services.</div>
-                        <a href="{{ route('citizen.offices') }}" class="btn btn-sm btn-primary">Browse services</a>
+                        <div class="fw-semibold mb-1">{{ __('No service requests yet') }}</div>
+                        <div class="text-muted mb-3">{{ __('Start by browsing available municipality services.') }}</div>
+                        <a href="{{ route('citizen.offices') }}" class="btn btn-sm btn-primary">{{ __('Browse services') }}</a>
                     </div>
                 @endif
             </div>
@@ -237,8 +237,8 @@
     <div class="col-12 col-xl-4">
         <div class="card h-100 citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <h6 class="card-title">Upcoming Appointments</h6>
-                <small class="text-muted">Scheduled visits and timings</small>
+                <h6 class="card-title">{{ __('Upcoming Appointments') }}</h6>
+                <small class="text-muted">{{ __('Scheduled visits and timings') }}</small>
             </div>
             <div class="card-body">
                 @if($upcomingAppointments->count())
@@ -258,7 +258,7 @@
                         @endforeach
                     </div>
                 @else
-                    <div class="text-muted text-center citizen-appointment-empty">No upcoming appointments.</div>
+                    <div class="text-muted text-center citizen-appointment-empty">{{ __('No upcoming appointments.') }}</div>
                 @endif
             </div>
         </div>
@@ -269,8 +269,8 @@
     <div class="col-12">
         <div class="card citizen-reveal" data-citizen-reveal>
             <div class="card-header">
-                <h6 class="card-title">Recent Notifications</h6>
-                <small class="text-muted">Latest activity and system messages</small>
+                <h6 class="card-title">{{ __('Recent Notifications') }}</h6>
+                <small class="text-muted">{{ __('Latest activity and system messages') }}</small>
             </div>
             <div class="card-body">
                 @if($recentNotifications->count())
@@ -278,17 +278,17 @@
                         @foreach($recentNotifications as $notification)
                             <div class="list-group-item citizen-note-item px-0 d-flex justify-content-between align-items-start bg-transparent border-bottom">
                                 <div>
-                                    <div class="fw-semibold citizen-note-title">{{ $notification->data['message'] ?? 'Notification received' }}</div>
+                                    <div class="fw-semibold citizen-note-title">{{ $notification->data['message'] ?? __('Notification received') }}</div>
                                     <div class="text-muted citizen-note-time">{{ $notification->created_at->diffForHumans() }}</div>
                                 </div>
                                 @if(is_null($notification->read_at))
-                                    <span class="badge rounded-pill citizen-note-badge">new</span>
+                                    <span class="badge rounded-pill citizen-note-badge">{{ __('new') }}</span>
                                 @endif
                             </div>
                         @endforeach
                     </div>
                 @else
-                    <div class="text-muted text-center citizen-note-empty">No notifications to display.</div>
+                    <div class="text-muted text-center citizen-note-empty">{{ __('No notifications to display.') }}</div>
                 @endif
             </div>
         </div>
