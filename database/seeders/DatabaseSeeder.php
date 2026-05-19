@@ -17,6 +17,7 @@ use App\Models\{
 };
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
@@ -338,6 +339,9 @@ class DatabaseSeeder extends Seeder
                 ? "Test Citizen {$i}"
                 : $faker->randomElement($firstNames) . ' ' . $faker->randomElement($lastNames);
 
+            $idDocumentPath = "seed/id_documents/citizen_{$i}.pdf";
+            Storage::disk('private')->put($idDocumentPath, "%PDF-1.4\n% Seed National ID placeholder for citizen {$i}\n");
+
             User::updateOrCreate(
                 ['email' => "citizen{$i}@test.com"],
                 [
@@ -346,6 +350,11 @@ class DatabaseSeeder extends Seeder
                     'role' => 'citizen',
                     'phone' => '+961 70 ' . str_pad((string) $faker->numberBetween(100000, 999999), 6, '0', STR_PAD_LEFT),
                     'national_id' => 'LB-' . str_pad((string) (100000000 + $i), 9, '0', STR_PAD_LEFT),
+                    'id_document' => $idDocumentPath,
+                    'citizen_verification_status' => 'approved',
+                    'citizen_verification_notes' => null,
+                    'citizen_verified_at' => now(),
+                    'citizen_verified_by' => null,
                     'is_active' => true,
                     'email_verified_at' => now(),
                 ]

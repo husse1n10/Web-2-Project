@@ -85,6 +85,10 @@ class CitizenController extends Controller
             }
 
             $user->id_document = $request->file('national_id_document')->store('id_documents', 'private');
+            $user->citizen_verification_status = 'pending';
+            $user->citizen_verification_notes = null;
+            $user->citizen_verified_at = null;
+            $user->citizen_verified_by = null;
         }
 
         if ($wantsPasswordUpdate) {
@@ -95,7 +99,7 @@ class CitizenController extends Controller
 
         $message = $hasDocumentUpload && $wantsPasswordUpdate
             ? 'Profile document and password updated successfully.'
-            : ($hasDocumentUpload ? 'National ID document uploaded successfully.' : 'Password updated successfully.');
+            : ($hasDocumentUpload ? 'National ID document uploaded successfully. It is now pending admin validation.' : 'Password updated successfully.');
 
         return back()->with('success', $message);
     }

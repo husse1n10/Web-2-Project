@@ -49,6 +49,8 @@ class CitizenRequestSubmissionTest extends TestCase
             'is_active' => true,
             'national_id' => '1234567890',
             'id_document' => 'id_documents/fake.pdf',
+            'citizen_verification_status' => 'approved',
+            'citizen_verified_at' => now(),
         ]);
     }
 
@@ -97,6 +99,27 @@ class CitizenRequestSubmissionTest extends TestCase
             'is_active' => true,
             'national_id' => null,
             'id_document' => null,
+        ]);
+
+        $service = $this->makeServiceWithOffice();
+
+        $response = $this->actingAs($citizen)->post(
+            route('citizen.requests.submit', $service),
+            ['notes' => 'should fail']
+        );
+
+        $response->assertRedirect(route('citizen.profile'));
+        $this->assertSame(0, ServiceRequest::count());
+    }
+
+    public function test_submission_is_blocked_when_citizen_identity_is_not_approved(): void
+    {
+        $citizen = User::factory()->create([
+            'role' => 'citizen',
+            'is_active' => true,
+            'national_id' => '1234567890',
+            'id_document' => 'id_documents/fake.pdf',
+            'citizen_verification_status' => 'pending',
         ]);
 
         $service = $this->makeServiceWithOffice();

@@ -8,6 +8,7 @@
     .admin-filter-form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
     .admin-filter-search { flex: 1; min-width: 160px; }
     .admin-filter-role { min-width: 140px; }
+    .admin-filter-verification { min-width: 180px; }
     .admin-plain-btn { margin-top: auto; }
 
     /* Avatars — gradient */
@@ -46,6 +47,14 @@
     }
 
     .admin-date { font-size: .78rem; color: var(--es-muted); }
+    .admin-identity-cell { min-width: 190px; }
+    .admin-identity-meta { margin-top: .25rem; font-size: .68rem; color: var(--es-muted); }
+    .admin-action-row { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+    .sbadge.s-pending {
+        background: rgba(255,251,235,0.78);
+        border-color: rgba(251,191,36,0.35);
+        color: #B45309;
+    }
 
     /* Action buttons — glass with hover gradient */
     .admin-action-danger {
@@ -65,6 +74,49 @@
     .admin-action-success:hover {
         background: #059669; color: #fff; border-color: transparent;
         box-shadow: 0 4px 12px rgba(5,150,105,0.2);
+    }
+    .admin-action-secondary {
+        background: rgba(219,234,254,0.6); backdrop-filter: blur(4px);
+        border: 1px solid rgba(147,197,253,0.45); color: #2563EB;
+        transition: all .22s ease;
+    }
+    .admin-action-secondary:hover {
+        background: #2563EB; color: #fff; border-color: transparent;
+        box-shadow: 0 4px 12px rgba(37,99,235,0.18);
+    }
+    .admin-review-modal .modal-dialog { max-width: 780px; }
+    .admin-review-grid {
+        display: grid;
+        grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+        gap: 1rem;
+    }
+    .admin-review-panel {
+        border: 1px solid rgba(226,232,240,0.72);
+        border-radius: .75rem;
+        padding: .9rem;
+        background: rgba(248,250,252,0.58);
+    }
+    .admin-review-panel-title {
+        font-size: .78rem;
+        font-weight: 800;
+        color: #334155;
+        margin-bottom: .7rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    .admin-review-row {
+        display: flex;
+        justify-content: space-between;
+        gap: .8rem;
+        padding: .46rem 0;
+        border-bottom: 1px solid rgba(226,232,240,0.62);
+        font-size: .78rem;
+    }
+    .admin-review-row:last-child { border-bottom: 0; }
+    .admin-review-label { color: #94A3B8; font-weight: 600; }
+    .admin-review-value { color: #0F172A; font-weight: 700; text-align: right; word-break: break-word; }
+    @media (max-width: 767.98px) {
+        .admin-review-grid { grid-template-columns: 1fr; }
     }
 
     .admin-empty { text-align: center; padding: 2rem; color: var(--es-muted); }
@@ -139,8 +191,18 @@
                     <option value="admin"       {{ request('role')==='admin'       ? 'selected':'' }}>Admin</option>
                 </select>
             </div>
+            <div class="admin-filter-verification">
+                <label class="form-label">Citizen Identity</label>
+                <select name="verification_status" class="form-select">
+                    <option value="">All</option>
+                    <option value="pending" {{ request('verification_status')==='pending' ? 'selected':'' }}>Pending approval</option>
+                    <option value="approved" {{ request('verification_status')==='approved' ? 'selected':'' }}>Approved</option>
+                    <option value="rejected" {{ request('verification_status')==='rejected' ? 'selected':'' }}>Rejected</option>
+                    <option value="missing_document" {{ request('verification_status')==='missing_document' ? 'selected':'' }}>Missing document</option>
+                </select>
+            </div>
             <button class="btn btn-primary btn-sm" style="margin-top:auto"><i class="bi bi-funnel"></i> Filter</button>
-            @if(request()->hasAny(['search','role']))
+            @if(request()->hasAny(['search','role','verification_status']))
                 <a href="{{ route('admin.users') }}" class="btn btn-sm admin-plain-btn" data-admin-busy-target="#adminUsersTableCard">Clear</a>
             @endif
         </form>
@@ -194,7 +256,8 @@
                         <th data-sort="1" data-sort-type="text">User</th>
                         <th data-sort="2" data-sort-type="text">Role</th>
                         <th data-sort="3" data-sort-type="text">Status</th>
-                        <th data-sort="4" data-sort-type="date">Joined</th>
+                        <th data-sort="4" data-sort-type="text">Identity</th>
+                        <th data-sort="5" data-sort-type="date">Joined</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -236,19 +299,51 @@
                             </span>
                         </td>
                         <td><span class="sbadge {{ $user->is_active ? 's-approved' : 's-rejected' }}">{{ $user->is_active ? 'Active' : 'Inactive' }}</span></td>
+                        <td>
+                            @if($user->isCitizen())
+                                @php
+                                    $identityStatus = $user->id_document ? ($user->citizen_verification_status ?? 'pending') : 'missing';
+                                    $identityBadgeClass = match($identityStatus) {
+                                        'approved' => 's-approved',
+                                        'rejected', 'missing' => 's-rejected',
+                                        default => 's-pending',
+                                    };
+                                    $identityLabel = $identityStatus === 'missing' ? 'No document' : ucfirst($identityStatus);
+                                @endphp
+                                <div class="admin-identity-cell">
+                                    <span class="sbadge {{ $identityBadgeClass }}">{{ $identityLabel }}</span>
+                                    <div class="admin-identity-meta">ID: {{ $user->national_id ?: '-' }}</div>
+                                    @if($user->citizen_verified_at)
+                                        <div class="admin-identity-meta">By {{ $user->citizenVerifier?->name ?? 'admin' }} on {{ $user->citizen_verified_at->format('M d, Y') }}</div>
+                                    @elseif($user->citizen_verification_notes)
+                                        <div class="admin-identity-meta">{{ \Illuminate\Support\Str::limit($user->citizen_verification_notes, 48) }}</div>
+                                    @endif
+                                </div>
+                            @else
+                                <span class="admin-row-email">Not required</span>
+                            @endif
+                        </td>
                         <td class="admin-date" data-sort-value="{{ $user->created_at->timestamp }}">{{ $user->created_at->format('M d, Y') }}</td>
                         <td>
-                            @if($user->id !== auth()->id())
-                            <form action="{{ route('admin.users.toggle', $user) }}" method="POST" class="js-user-toggle-form">
-                                @csrf @method('PATCH')
-                                <button class="btn btn-sm {{ $user->is_active ? 'admin-action-danger' : 'admin-action-success' }}">
-                                    <i class="bi bi-{{ $user->is_active ? 'person-x' : 'person-check' }}"></i>
-                                    {{ $user->is_active ? 'Deactivate' : 'Activate' }}
-                                </button>
-                            </form>
-                            @else
-                            <span class="admin-row-email">Current user</span>
-                            @endif
+                            <div class="admin-action-row">
+                                @if($user->id !== auth()->id())
+                                <form action="{{ route('admin.users.toggle', $user) }}" method="POST" class="js-user-toggle-form">
+                                    @csrf @method('PATCH')
+                                    <button class="btn btn-sm {{ $user->is_active ? 'admin-action-danger' : 'admin-action-success' }}">
+                                        <i class="bi bi-{{ $user->is_active ? 'person-x' : 'person-check' }}"></i>
+                                        {{ $user->is_active ? 'Deactivate' : 'Activate' }}
+                                    </button>
+                                </form>
+                                @else
+                                <span class="admin-row-email">Current user</span>
+                                @endif
+
+                                @if($user->isCitizen())
+                                    <button type="button" class="btn btn-sm admin-action-secondary" data-bs-toggle="modal" data-bs-target="#reviewCitizenModal{{ $user->id }}">
+                                        <i class="bi bi-card-checklist"></i> Review / Edit
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty
@@ -268,9 +363,27 @@
                     <div class="admin-row-email">{{ $user->email }}</div>
                     <div style="margin-top:3px">
                         <span class="admin-row-email" style="font-weight:600">{{ ucfirst(str_replace('_',' ',$user->role)) }}</span>
+                        @if($user->isCitizen())
+                            @php
+                                $mobileIdentityStatus = $user->id_document ? ($user->citizen_verification_status ?? 'pending') : 'missing';
+                                $mobileIdentityClass = match($mobileIdentityStatus) {
+                                    'approved' => 's-approved',
+                                    'rejected', 'missing' => 's-rejected',
+                                    default => 's-pending',
+                                };
+                            @endphp
+                            <span class="sbadge {{ $mobileIdentityClass }}" style="margin-left:.35rem">
+                                {{ $mobileIdentityStatus === 'missing' ? 'No document' : ucfirst($mobileIdentityStatus) }}
+                            </span>
+                        @endif
                     </div>
                 </div>
                 <span class="sbadge {{ $user->is_active ? 's-approved' : 's-rejected' }}">{{ $user->is_active ? 'Active' : 'Off' }}</span>
+                @if($user->isCitizen())
+                    <button type="button" class="btn btn-sm admin-action-secondary" data-bs-toggle="modal" data-bs-target="#reviewCitizenModal{{ $user->id }}">
+                        Review
+                    </button>
+                @endif
             </div>
             @empty
             <div class="admin-empty">No users found.</div>
@@ -314,6 +427,127 @@
         </div>
     </div>
 </div>
+
+{{-- Citizen Review / Edit Modals --}}
+@foreach($users as $reviewUser)
+    @if($reviewUser->isCitizen())
+        @php
+            $reviewIdentityStatus = $reviewUser->id_document ? ($reviewUser->citizen_verification_status ?? 'pending') : 'missing';
+            $reviewIdentityClass = match($reviewIdentityStatus) {
+                'approved' => 's-approved',
+                'rejected', 'missing' => 's-rejected',
+                default => 's-pending',
+            };
+            $reviewIdentityLabel = $reviewIdentityStatus === 'missing' ? 'No document' : ucfirst($reviewIdentityStatus);
+            $reviewFormId = 'reviewCitizenForm' . $reviewUser->id;
+        @endphp
+        <div class="modal fade admin-modal admin-review-modal" id="reviewCitizenModal{{ $reviewUser->id }}" tabindex="-1" aria-labelledby="reviewCitizenTitle{{ $reviewUser->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h6 class="modal-title" id="reviewCitizenTitle{{ $reviewUser->id }}">Review Citizen Identity</h6>
+                            <div class="admin-row-email">{{ $reviewUser->email }}</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="admin-review-grid">
+                            <div class="admin-review-panel">
+                                <div class="admin-review-panel-title">Submitted Information</div>
+                                <div class="admin-review-row">
+                                    <span class="admin-review-label">Full name</span>
+                                    <span class="admin-review-value">{{ $reviewUser->name }}</span>
+                                </div>
+                                <div class="admin-review-row">
+                                    <span class="admin-review-label">Email</span>
+                                    <span class="admin-review-value">{{ $reviewUser->email }}</span>
+                                </div>
+                                <div class="admin-review-row">
+                                    <span class="admin-review-label">Phone</span>
+                                    <span class="admin-review-value">{{ $reviewUser->phone ?: '-' }}</span>
+                                </div>
+                                <div class="admin-review-row">
+                                    <span class="admin-review-label">National ID</span>
+                                    <span class="admin-review-value">{{ $reviewUser->national_id ?: '-' }}</span>
+                                </div>
+                                <div class="admin-review-row">
+                                    <span class="admin-review-label">Identity status</span>
+                                    <span class="admin-review-value"><span class="sbadge {{ $reviewIdentityClass }}">{{ $reviewIdentityLabel }}</span></span>
+                                </div>
+                                <div class="admin-review-row">
+                                    <span class="admin-review-label">Joined</span>
+                                    <span class="admin-review-value">{{ $reviewUser->created_at->format('M d, Y H:i') }}</span>
+                                </div>
+                                <div class="mt-3">
+                                    @if($reviewUser->id_document)
+                                        <a href="{{ route('admin.users.identity.document', $reviewUser) }}" target="_blank" class="btn btn-sm admin-action-secondary">
+                                            <i class="bi bi-file-earmark-person"></i> Open ID Document
+                                        </a>
+                                    @else
+                                        <span class="sbadge s-rejected">No ID document uploaded</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="admin-review-panel">
+                                <div class="admin-review-panel-title">Edit Citizen Information</div>
+                                <form id="{{ $reviewFormId }}" action="{{ route('admin.users.update', $reviewUser) }}" method="POST">
+                                    @csrf
+                                    @method('PATCH')
+                                    <div class="mb-2">
+                                        <label class="form-label">Full Name</label>
+                                        <input type="text" name="name" class="form-control" value="{{ old('name', $reviewUser->name) }}" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" name="email" class="form-control" value="{{ old('email', $reviewUser->email) }}" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">Phone</label>
+                                        <input type="text" name="phone" class="form-control" value="{{ old('phone', $reviewUser->phone) }}" placeholder="+961...">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">National ID Number</label>
+                                        <input type="text" name="national_id" class="form-control" value="{{ old('national_id', $reviewUser->national_id) }}">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Admin Note</label>
+                                        <textarea name="citizen_verification_notes" class="form-control" rows="3" placeholder="Reason for rejection or correction note">{{ old('citizen_verification_notes', $reviewUser->citizen_verification_notes) }}</textarea>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm admin-plain-btn" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" form="{{ $reviewFormId }}" class="btn btn-sm admin-action-secondary">
+                            <i class="bi bi-save"></i> Save Info
+                        </button>
+                        @if($reviewUser->id_document && !$reviewUser->isCitizenIdentityRejected())
+                            <form action="{{ route('admin.users.identity.reject', $reviewUser) }}" method="POST" onsubmit="return confirm('Reject this citizen identity?')">
+                                @csrf
+                                @method('PATCH')
+                                <button class="btn btn-sm admin-action-danger">
+                                    <i class="bi bi-x-octagon"></i> Reject
+                                </button>
+                            </form>
+                        @endif
+                        @if($reviewUser->id_document && !$reviewUser->isCitizenIdentityApproved())
+                            <form action="{{ route('admin.users.identity.approve', $reviewUser) }}" method="POST" onsubmit="return confirm('Approve this citizen identity?')">
+                                @csrf
+                                @method('PATCH')
+                                <button class="btn btn-sm admin-action-success">
+                                    <i class="bi bi-patch-check"></i> Approve
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+@endforeach
 
 @push('scripts')
 <script>
@@ -428,4 +662,3 @@
 </script>
 @endpush
 @endsection
-

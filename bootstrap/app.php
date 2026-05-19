@@ -27,7 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return route('home');
             }
 
-            if ($user->role === 'citizen' && ! $user->hasCompletedCitizenProfile()) {
+            if ($user->role === 'citizen' && (
+                ! $user->hasCompletedCitizenProfile() || ! $user->hasVerifiedCitizenIdentity()
+            )) {
                 return route('citizen.profile');
             }
 
@@ -42,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'citizen.profile.complete' => \App\Http\Middleware\EnsureCitizenProfileComplete::class,
+            'citizen.identity.approved' => \App\Http\Middleware\EnsureCitizenIdentityApproved::class,
         ]);
 
         // Security headers on all web responses.

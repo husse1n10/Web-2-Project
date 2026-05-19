@@ -17,6 +17,10 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'role', 'phone', 'phone_verified_at', 'national_id',
         'id_document',          // column in migration
+        'citizen_verification_status',
+        'citizen_verification_notes',
+        'citizen_verified_at',
+        'citizen_verified_by',
         'is_active',
         'two_factor_secret',    // column in migration
         'two_factor_enabled',   // column in migration
@@ -27,6 +31,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at'  => 'datetime',
+        'citizen_verified_at' => 'datetime',
         'is_active'          => 'boolean',
         'two_factor_enabled' => 'boolean',
     ];
@@ -66,6 +71,26 @@ class User extends Authenticatable
         return $missing;
     }
 
+    public function hasVerifiedCitizenIdentity(): bool
+    {
+        return !$this->isCitizen() || $this->citizen_verification_status === 'approved';
+    }
+
+    public function isCitizenIdentityPending(): bool
+    {
+        return $this->isCitizen() && $this->citizen_verification_status === 'pending';
+    }
+
+    public function isCitizenIdentityApproved(): bool
+    {
+        return $this->isCitizen() && $this->citizen_verification_status === 'approved';
+    }
+
+    public function isCitizenIdentityRejected(): bool
+    {
+        return $this->isCitizen() && $this->citizen_verification_status === 'rejected';
+    }
+
     // ── Relationships ─────────────────────────────────────────────
     public function offices()
     {
@@ -91,6 +116,11 @@ class User extends Authenticatable
     public function supportTickets()
     {
         return $this->hasMany(SupportTicket::class);
+    }
+
+    public function citizenVerifier()
+    {
+        return $this->belongsTo(User::class, 'citizen_verified_by');
     }
 
     public function sendPasswordResetNotification($token): void

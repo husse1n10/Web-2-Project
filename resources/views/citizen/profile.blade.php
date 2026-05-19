@@ -17,6 +17,13 @@
     $pendingRequests = $allRequests->whereIn('status', ['pending', 'in_review', 'missing_documents', 'approved'])->count();
     $paidRequests = $paidRequests
         ?? $user->serviceRequests()->with(['service', 'office'])->where('payment_status', 'paid')->latest('updated_at')->take(5)->get();
+    $identityStatus = $user->id_document ? ($user->citizen_verification_status ?? 'pending') : 'missing';
+    $identityBadgeClass = match($identityStatus) {
+        'approved' => 'is-success',
+        'rejected', 'missing' => 'is-danger',
+        default => 'is-warning',
+    };
+    $identityLabel = $identityStatus === 'missing' ? 'No document' : ucfirst($identityStatus);
 @endphp
 
 <div class="citizen-profile-grid">
@@ -28,6 +35,24 @@
                     <div class="citizen-profile-alert-title">Complete your profile to submit requests</div>
                     <div class="citizen-profile-alert-copy">
                         Missing: {{ implode(', ', $missingFields) }}. Fill the fields below, then save.
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if(empty($missingFields) && !$user->hasVerifiedCitizenIdentity())
+        <div class="card citizen-profile-alert citizen-reveal" data-citizen-reveal>
+            <div class="card-body">
+                <i class="bi bi-shield-exclamation"></i>
+                <div>
+                    <div class="citizen-profile-alert-title">Identity validation required</div>
+                    <div class="citizen-profile-alert-copy">
+                        @if($user->isCitizenIdentityRejected())
+                            Your National ID document was rejected. Upload a corrected document and wait for admin approval.
+                        @else
+                            Your National ID document is pending admin validation. Citizen services unlock after approval.
+                        @endif
                     </div>
                 </div>
             </div>
@@ -127,23 +152,35 @@
                         </div>
                         <div>
                             <label class="form-label">National ID Document</label>
-                            @if($user->id_document)
+                            @if($user->id_document && $user->isCitizenIdentityApproved())
                                 <div class="citizen-id-verified">
                                     <i class="bi bi-patch-check-fill"></i>
-                                    <span>ID document on file — verified at registration</span>
+                                    <span>ID document approved by admin</span>
                                 </div>
                             @else
+                                @if($user->id_document)
+                                    <div class="citizen-id-{{ $user->isCitizenIdentityRejected() ? 'missing' : 'pending' }} mb-2">
+                                        <i class="bi bi-{{ $user->isCitizenIdentityRejected() ? 'x-circle-fill' : 'hourglass-split' }}"></i>
+                                        <span>
+                                            @if($user->isCitizenIdentityRejected())
+                                                ID document rejected. Upload a corrected document.
+                                            @else
+                                                ID document uploaded. Waiting for admin validation.
+                                            @endif
+                                        </span>
+                                    </div>
+                                @endif
                                 <label class="citizen-upload-zone" id="idUploadZone" for="national_id_doc">
                                     <input type="file" id="national_id_doc" name="national_id_document" accept=".jpg,.jpeg,.png,.pdf">
                                     <span class="citizen-upload-icon"><i class="bi bi-cloud-arrow-up"></i></span>
-                                    <span class="citizen-upload-title">Upload national ID document</span>
+                                    <span class="citizen-upload-title">{{ $user->id_document ? 'Upload replacement document' : 'Upload national ID document' }}</span>
                                     <span class="citizen-upload-sub">JPG, PNG or PDF, max 5 MB</span>
                                 </label>
                                 <div id="uploadPreview" class="citizen-upload-preview" style="display:none">
                                     <i class="bi bi-file-earmark-check"></i>
                                     <span id="uploadName"></span>
                                 </div>
-                                <div class="form-text">Select the file, then press Save Changes.</div>
+                                <div class="form-text">Select the file, then press Save Changes. Admin approval is required before using citizen services.</div>
                                 <div id="ocrStatus" class="citizen-ocr-status" role="status" aria-live="polite"></div>
                                 @error('national_id_document')
                                     <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
@@ -287,10 +324,14 @@
                     <span class="citizen-info-label">Member Since</span>
                     <span class="citizen-info-value">{{ $user->created_at->format('F d, Y') }}</span>
                 </div>
-                @if($user->id_document)
+                <div class="citizen-info-row">
+                    <span class="citizen-info-label">ID Document</span>
+                    <span class="citizen-badge {{ $identityBadgeClass }}"><i class="bi bi-shield-check me-1"></i>{{ $identityLabel }}</span>
+                </div>
+                @if($user->citizen_verification_notes)
                     <div class="citizen-info-row">
-                        <span class="citizen-info-label">ID Document</span>
-                        <span class="citizen-badge is-success"><i class="bi bi-check2 me-1"></i>Uploaded</span>
+                        <span class="citizen-info-label">Admin Note</span>
+                        <span class="citizen-info-value">{{ $user->citizen_verification_notes }}</span>
                     </div>
                 @endif
             </div>
@@ -531,6 +572,18 @@ body.es-role-citizen .citizen-badge.is-muted {
     color: #64748B;
     background: rgba(241,245,249,0.5);
     border-color: rgba(226,232,240,0.5);
+}
+
+body.es-role-citizen .citizen-badge.is-warning {
+    color: #B45309;
+    background: rgba(255,251,235,0.65);
+    border-color: rgba(251,191,36,0.28);
+}
+
+body.es-role-citizen .citizen-badge.is-danger {
+    color: #B91C1C;
+    background: rgba(254,242,242,0.65);
+    border-color: rgba(248,113,113,0.28);
 }
 
 /* ── Stat cards with gradient icons ── */
@@ -819,7 +872,8 @@ body.es-role-citizen .citizen-otp-input {
 }
 
 body.es-role-citizen .citizen-id-verified,
-body.es-role-citizen .citizen-id-missing {
+body.es-role-citizen .citizen-id-missing,
+body.es-role-citizen .citizen-id-pending {
     display: flex;
     align-items: center;
     gap: .5rem;
@@ -840,6 +894,12 @@ body.es-role-citizen .citizen-id-missing {
     background: rgba(255,247,237,0.6);
     border: 1px solid rgba(234,88,12,0.15);
     color: #9A3412;
+}
+
+body.es-role-citizen .citizen-id-pending {
+    background: rgba(255,251,235,0.65);
+    border: 1px solid rgba(251,191,36,0.22);
+    color: #B45309;
 }
 
 body.es-role-citizen .citizen-info-row {

@@ -18,6 +18,10 @@ Route::get('/', function () {
         return redirect()->route('citizen.profile');
     }
 
+    if (auth()->user()->role === 'citizen' && !auth()->user()->hasVerifiedCitizenIdentity()) {
+        return redirect()->route('citizen.profile');
+    }
+
     return match (auth()->user()->role) {
         'admin' => redirect()->route('admin.dashboard'),
         'office_user' => redirect()->route('office.dashboard'),
@@ -84,7 +88,11 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 
     Route::get('/users',                        [AdminController::class, 'users'])->name('users');
     Route::post('/users/office-user',           [AdminController::class, 'createOfficeUser'])->name('users.office.create');
+    Route::patch('/users/{user}',               [AdminController::class, 'updateUser'])->name('users.update');
     Route::patch('/users/{user}/toggle-status', [AdminController::class, 'toggleUserStatus'])->name('users.toggle');
+    Route::get('/users/{user}/identity-document', [AdminController::class, 'downloadCitizenIdentityDocument'])->name('users.identity.document');
+    Route::patch('/users/{user}/identity/approve', [AdminController::class, 'approveCitizenIdentity'])->name('users.identity.approve');
+    Route::patch('/users/{user}/identity/reject', [AdminController::class, 'rejectCitizenIdentity'])->name('users.identity.reject');
 
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
 
@@ -131,9 +139,12 @@ Route::middleware(['auth', 'role:office_user'])->prefix('office')->name('office.
 // ── Citizen ───────────────────────────────────────────────────────────────────
 
 Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')->group(function () {
-    Route::get('/dashboard', [CitizenController::class, 'dashboard'])->name('dashboard');
+    Route::get('/dashboard', [CitizenController::class, 'dashboard'])
+        ->middleware('citizen.identity.approved')
+        ->name('dashboard');
     Route::get('/requests/{serviceRequest}/messages', [CitizenController::class, 'getMessages'])
-    ->name('messages.get');
+        ->middleware('citizen.identity.approved')
+        ->name('messages.get');
 
     // Profile
     Route::get('/profile',  [CitizenController::class, 'profile'])->name('profile');
@@ -148,11 +159,11 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
     Route::post('/profile/id-extract', [AuthController::class, 'extractNationalIdDocument'])->name('profile.id-extract');
 
     // Browse
-    Route::get('/offices',          [CitizenController::class, 'browseOffices'])->name('offices');
-    Route::get('/offices/{office}', [CitizenController::class, 'showOffice'])->name('offices.show');
-    Route::get('/services/{service}', [CitizenController::class, 'showService'])->name('services.show');
+    Route::get('/offices',          [CitizenController::class, 'browseOffices'])->middleware('citizen.identity.approved')->name('offices');
+    Route::get('/offices/{office}', [CitizenController::class, 'showOffice'])->middleware('citizen.identity.approved')->name('offices.show');
+    Route::get('/services/{service}', [CitizenController::class, 'showService'])->middleware('citizen.identity.approved')->name('services.show');
 
-    Route::middleware('citizen.profile.complete')->group(function () {
+    Route::middleware(['citizen.identity.approved', 'citizen.profile.complete'])->group(function () {
         // Submit request
         Route::post('/services/{service}/request', [CitizenController::class, 'submitRequest'])->name('requests.submit');
 
@@ -172,31 +183,31 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
     });
 
     // My requests
-    Route::get('/requests',                   [CitizenController::class, 'myRequests'])->name('requests');
-    Route::get('/requests/{serviceRequest}',  [CitizenController::class, 'showRequest'])->name('requests.show');
+    Route::get('/requests',                   [CitizenController::class, 'myRequests'])->middleware('citizen.identity.approved')->name('requests');
+    Route::get('/requests/{serviceRequest}',  [CitizenController::class, 'showRequest'])->middleware('citizen.identity.approved')->name('requests.show');
 
     // Appointments & Payments (dedicated pages)
-    Route::get('/appointments', [CitizenController::class, 'myAppointments'])->name('appointments');
-    Route::get('/payments',     [CitizenController::class, 'myPayments'])->name('payments');
+    Route::get('/appointments', [CitizenController::class, 'myAppointments'])->middleware('citizen.identity.approved')->name('appointments');
+    Route::get('/payments',     [CitizenController::class, 'myPayments'])->middleware('citizen.identity.approved')->name('payments');
 
     // Messages
-    Route::post('/requests/{serviceRequest}/messages', [CitizenController::class, 'sendMessage'])->name('messages.send');
+    Route::post('/requests/{serviceRequest}/messages', [CitizenController::class, 'sendMessage'])->middleware('citizen.identity.approved')->name('messages.send');
 
     // Documents
-    Route::get('/requests/{serviceRequest}/documents/{docId}', [CitizenController::class, 'downloadDocument'])->name('documents.download');
+    Route::get('/requests/{serviceRequest}/documents/{docId}', [CitizenController::class, 'downloadDocument'])->middleware('citizen.identity.approved')->name('documents.download');
 
     // PDF receipt download
-    Route::get('/requests/{serviceRequest}/receipt', [CitizenController::class, 'downloadReceipt'])->name('requests.receipt');
+    Route::get('/requests/{serviceRequest}/receipt', [CitizenController::class, 'downloadReceipt'])->middleware('citizen.identity.approved')->name('requests.receipt');
 
     // AI chatbot — 30 req/min per citizen
     Route::post('/chatbot', [CitizenController::class, 'chatbotAsk'])
-        ->middleware('throttle:30,1')
+        ->middleware(['citizen.identity.approved', 'throttle:30,1'])
         ->name('chatbot.ask');
 
     // Support tickets
-    Route::get('/support',                  [CitizenController::class, 'supportIndex'])->name('support');
-    Route::get('/support/create',           [CitizenController::class, 'supportCreate'])->name('support.create');
-    Route::post('/support',                 [CitizenController::class, 'supportStore'])->name('support.store');
-    Route::get('/support/{ticket}',         [CitizenController::class, 'supportShow'])->name('support.show');
-    Route::post('/support/{ticket}/reply',  [CitizenController::class, 'supportReply'])->name('support.reply');
+    Route::get('/support',                  [CitizenController::class, 'supportIndex'])->middleware('citizen.identity.approved')->name('support');
+    Route::get('/support/create',           [CitizenController::class, 'supportCreate'])->middleware('citizen.identity.approved')->name('support.create');
+    Route::post('/support',                 [CitizenController::class, 'supportStore'])->middleware('citizen.identity.approved')->name('support.store');
+    Route::get('/support/{ticket}',         [CitizenController::class, 'supportShow'])->middleware('citizen.identity.approved')->name('support.show');
+    Route::post('/support/{ticket}/reply',  [CitizenController::class, 'supportReply'])->middleware('citizen.identity.approved')->name('support.reply');
 });

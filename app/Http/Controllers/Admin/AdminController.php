@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
@@ -373,15 +375,31 @@ class AdminController extends Controller
     // User Management
     public function users(Request $request)
     {
-        $query = User::query();
-        if ($request->role) $query->where('role', $request->role);
+        $query = User::query()->with('citizenVerifier:id,name');
+
+        if ($request->role) {
+            $query->where('role', $request->role);
+        }
+
+        if (in_array($request->verification_status, ['pending', 'approved', 'rejected', 'missing_document'], true)) {
+            $query->where('role', 'citizen');
+
+            if ($request->verification_status === 'missing_document') {
+                $query->whereNull('id_document');
+            } else {
+                $query->where('citizen_verification_status', $request->verification_status);
+            }
+        }
+
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('email', 'like', "%{$request->search}%");
+                  ->orWhere('email', 'like', "%{$request->search}%")
+                  ->orWhere('national_id', 'like', "%{$request->search}%");
             });
         }
-        $users = $query->paginate(20);
+
+        $users = $query->latest()->paginate(20)->withQueryString();
         return view('admin.users.index', compact('users'));
     }
 
@@ -406,11 +424,104 @@ class AdminController extends Controller
         return back()->with('success', 'Office user created.');
     }
 
+    public function updateUser(Request $request, User $user)
+    {
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:20'],
+        ];
+
+        if ($user->isCitizen()) {
+            $rules['national_id'] = ['nullable', 'string', 'max:50'];
+            $rules['citizen_verification_notes'] = ['nullable', 'string', 'max:500'];
+        }
+
+        $data = $request->validate($rules);
+
+        $payload = [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+        ];
+
+        if ($user->isCitizen()) {
+            $payload['national_id'] = $data['national_id'] ?? null;
+            $payload['citizen_verification_notes'] = $data['citizen_verification_notes'] ?? null;
+        }
+
+        $user->update($payload);
+
+        return back()->with('success', 'User information updated.');
+    }
+
     public function toggleUserStatus(User $user)
     {
         $user->update(['is_active' => !$user->is_active]);
         $status = $user->is_active ? 'activated' : 'deactivated';
         return back()->with('success', "User account {$status}.");
+    }
+
+    public function downloadCitizenIdentityDocument(User $user)
+    {
+        abort_unless($user->isCitizen(), 404);
+        abort_if(blank($user->id_document), 404);
+
+        $disk = Storage::disk('private');
+        abort_unless($disk->exists($user->id_document), 404);
+
+        $extension = pathinfo($user->id_document, PATHINFO_EXTENSION);
+        $filename = 'citizen-' . $user->id . '-national-id' . ($extension ? ".{$extension}" : '');
+
+        $path = $disk->path($user->id_document);
+        $mime = $disk->mimeType($user->id_document) ?: 'application/octet-stream';
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    public function approveCitizenIdentity(User $user)
+    {
+        abort_unless($user->isCitizen(), 404);
+
+        if (blank($user->id_document)) {
+            return back()->with('error', 'This citizen has not uploaded a National ID document yet.');
+        }
+
+        $user->forceFill([
+            'citizen_verification_status' => 'approved',
+            'citizen_verification_notes' => null,
+            'citizen_verified_at' => now(),
+            'citizen_verified_by' => auth()->id(),
+        ])->save();
+
+        return back()->with('success', 'Citizen identity approved.');
+    }
+
+    public function rejectCitizenIdentity(Request $request, User $user)
+    {
+        abort_unless($user->isCitizen(), 404);
+
+        if (blank($user->id_document)) {
+            return back()->with('error', 'This citizen has not uploaded a National ID document yet.');
+        }
+
+        $data = $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $user->forceFill([
+            'citizen_verification_status' => 'rejected',
+            'citizen_verification_notes' => array_key_exists('notes', $data)
+                ? $data['notes']
+                : $user->citizen_verification_notes,
+            'citizen_verified_at' => null,
+            'citizen_verified_by' => auth()->id(),
+        ])->save();
+
+        return back()->with('success', 'Citizen identity rejected.');
     }
 
     // Reporting

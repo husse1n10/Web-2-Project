@@ -64,6 +64,7 @@ class AuthController extends Controller
             'national_id' => $data['national_id'],
             'phone'       => $data['phone'] ?? null,
             'id_document' => $docPath,   // ← correct column name
+            'citizen_verification_status' => 'pending',
             'role'        => 'citizen',
             'is_active'   => true,
         ]);
@@ -533,6 +534,7 @@ class AuthController extends Controller
                 'social_provider' => $payload['provider'] ?? null,
                 'social_id'       => $payload['social_id'] ?? null,
                 'avatar'          => $payload['avatar'] ?? null,
+                'citizen_verification_status' => 'pending',
                 'is_active'       => true,
                 'email_verified_at' => now(),
             ]);
@@ -920,6 +922,14 @@ class AuthController extends Controller
         if ($user->role === 'citizen' && !$user->hasCompletedCitizenProfile()) {
             return redirect()->route('citizen.profile')
                 ->with('info', 'Please complete your profile before submitting requests.');
+        }
+
+        if ($user->role === 'citizen' && !$user->hasVerifiedCitizenIdentity()) {
+            $message = $user->isCitizenIdentityRejected()
+                ? 'Your National ID document was rejected. Upload a corrected document and wait for admin approval.'
+                : 'Your National ID document is pending admin validation. You can use the portal after approval.';
+
+            return redirect()->route('citizen.profile')->with('warning', $message);
         }
 
         return match ($user->role) {
