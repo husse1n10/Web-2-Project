@@ -313,13 +313,13 @@ async function extractIdData(file) {
             return;
         }
 
-        if (payload?.data?.national_id && nationalIdInput && !nationalIdInput.value.trim()) {
+        if (payload?.data?.national_id && nationalIdInput) {
             nationalIdInput.value = payload.data.national_id;
         }
-        if (payload?.data?.first_name && firstNameInput && !firstNameInput.value.trim()) {
+        if (payload?.data?.first_name && firstNameInput) {
             firstNameInput.value = payload.data.first_name;
         }
-        if (payload?.data?.last_name && lastNameInput && !lastNameInput.value.trim()) {
+        if (payload?.data?.last_name && lastNameInput) {
             lastNameInput.value = payload.data.last_name;
         }
 
@@ -338,7 +338,6 @@ idDocumentInput?.addEventListener('change', () => {
 </script>
 </body>
 </html>
-
 
 
 
