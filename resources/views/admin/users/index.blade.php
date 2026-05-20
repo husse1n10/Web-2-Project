@@ -151,6 +151,7 @@
     .admin-modal .modal-title { font-weight: 700; color: #566A7F; }
     .admin-modal .modal-body { padding: .75rem 1.25rem; }
     .admin-modal .modal-footer { border: none; padding: .75rem 1.25rem 1.1rem; gap: .5rem; }
+    .admin-modal.admin-review-modal .modal-dialog { max-width: 780px; }
 
     /* Bulk select */
     .admin-select-cell { width: 34px; text-align: center; }
@@ -158,6 +159,34 @@
     .admin-bulk-bar { display: none; align-items: center; gap: .5rem; }
     .admin-bulk-bar.show { display: inline-flex; }
     .admin-bulk-count { font-size: .76rem; color: #566A7F; font-weight: 600; margin-right: .2rem; }
+    .admin-pagination {
+        padding: .75rem 1rem;
+        border-top: 1px solid var(--es-border-soft);
+    }
+    .admin-pagination nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: .7rem;
+    }
+    .admin-pagination .pagination {
+        margin: 0;
+        gap: .25rem;
+    }
+    .admin-pagination .page-link {
+        min-width: 2.1rem;
+        border-radius: .5rem;
+        text-align: center;
+        font-size: .8rem;
+        line-height: 1.2;
+    }
+    .admin-pagination svg {
+        width: 1rem;
+        height: 1rem;
+        max-width: 1rem;
+        max-height: 1rem;
+    }
 
     @media (prefers-reduced-motion: reduce) {
         .admin-action-danger, .admin-action-success, .admin-mobile-item { transition: none; }
@@ -390,11 +419,12 @@
             @endforelse
         </div>
         @if($users->hasPages())
-        <div style="padding:.75rem 1rem;border-top:1px solid var(--es-border-soft)">{{ $users->links() }}</div>
+        <div class="admin-pagination">{{ $users->links('pagination::bootstrap-5') }}</div>
         @endif
     </div>
 </div>
 
+@push('modals')
 {{-- Add Office User Modal --}}
 <div class="modal fade admin-modal" id="addUserModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -548,6 +578,7 @@
         </div>
     @endif
 @endforeach
+@endpush
 
 @push('scripts')
 <script>

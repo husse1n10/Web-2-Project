@@ -33,6 +33,32 @@
     .admin-modal .modal-title { font-weight: 700; color: #566A7F; }
     .admin-modal .modal-body { padding: .75rem 1.25rem; }
     .admin-modal .modal-footer { border: none; padding: .75rem 1.25rem 1.1rem; gap: .5rem; }
+    .admin-modal.office-location .modal-dialog { max-width: 720px; }
+    .admin-office-map {
+        height: 260px;
+        border-radius: .75rem;
+        border: 1px solid rgba(148,163,184,0.38);
+        overflow: hidden;
+        background: rgba(241,245,249,0.72);
+    }
+    .admin-map-help {
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        margin-top: .45rem;
+        color: var(--es-muted);
+        font-size: .72rem;
+    }
+    .admin-map-unavailable {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 1rem;
+        text-align: center;
+        color: var(--es-muted);
+        font-size: .8rem;
+    }
 
     @media (prefers-reduced-motion: reduce) {
         .admin-mobile-item { transition: none; }
@@ -102,8 +128,18 @@
                         <td><span class="sbadge {{ $office->is_active ? 's-approved' : 's-rejected' }}">{{ $office->is_active ? 'Active' : 'Inactive' }}</span></td>
                         <td>
                             <div class="d-flex gap-1">
-                                <button class="btn btn-sm admin-icon-btn"
-                                        onclick="editOffice({{ $office->id }}, {{ Js::from($office->name) }}, {{ $office->municipality_id }}, {{ $office->is_active ? 1 : 0 }})">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm admin-icon-btn js-edit-office"
+                                    data-office-id="{{ $office->id }}"
+                                    data-office-name="{{ $office->name }}"
+                                    data-office-municipality="{{ $office->municipality_id }}"
+                                    data-office-address="{{ $office->address }}"
+                                    data-office-latitude="{{ $office->latitude }}"
+                                    data-office-longitude="{{ $office->longitude }}"
+                                    data-office-phone="{{ $office->phone }}"
+                                    data-office-email="{{ $office->email }}"
+                                    data-office-active="{{ $office->is_active ? 1 : 0 }}">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form
@@ -146,7 +182,7 @@
 </div>
 
 {{-- Add Office Modal --}}
-<div class="modal fade admin-modal" id="addOfficeModal" tabindex="-1">
+<div class="modal fade admin-modal office-location" id="addOfficeModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -167,9 +203,19 @@
                     </div>
                     <div class="mb-3"><label class="form-label">Office Name *</label><input type="text" name="name" class="form-control" required></div>
                     <div class="mb-3"><label class="form-label">Address *</label><input type="text" name="address" class="form-control" required></div>
+                    <div class="mb-3">
+                        <label class="form-label">Location on Map</label>
+                        <div id="addOfficeMap" class="admin-office-map">
+                            <div class="admin-map-unavailable">Loading map...</div>
+                        </div>
+                        <div class="admin-map-help">
+                            <i class="bi bi-pin-map"></i>
+                            Click the map to place the office pin. Latitude and longitude will update automatically.
+                        </div>
+                    </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.75rem">
-                        <div><label class="form-label">Latitude</label><input type="text" name="latitude" class="form-control" placeholder="33.8938"></div>
-                        <div><label class="form-label">Longitude</label><input type="text" name="longitude" class="form-control" placeholder="35.5018"></div>
+                        <div><label class="form-label">Latitude</label><input type="text" id="addOfficeLat" name="latitude" class="form-control" placeholder="33.8938"></div>
+                        <div><label class="form-label">Longitude</label><input type="text" id="addOfficeLng" name="longitude" class="form-control" placeholder="35.5018"></div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
                         <div><label class="form-label">Phone</label><input type="text" name="phone" class="form-control"></div>
@@ -186,7 +232,7 @@
 </div>
 
 {{-- Edit Modal --}}
-<div class="modal fade admin-modal narrow" id="editOfficeModal" tabindex="-1">
+<div class="modal fade admin-modal office-location" id="editOfficeModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -205,6 +251,25 @@
                         </select>
                     </div>
                     <div class="mb-3"><label class="form-label">Name *</label><input type="text" name="name" id="editOfficeName" class="form-control" required></div>
+                    <div class="mb-3"><label class="form-label">Address *</label><input type="text" name="address" id="editOfficeAddress" class="form-control" required></div>
+                    <div class="mb-3">
+                        <label class="form-label">Location on Map</label>
+                        <div id="editOfficeMap" class="admin-office-map">
+                            <div class="admin-map-unavailable">Loading map...</div>
+                        </div>
+                        <div class="admin-map-help">
+                            <i class="bi bi-pin-map"></i>
+                            Click the map to move the office pin. Latitude and longitude will update automatically.
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.75rem">
+                        <div><label class="form-label">Latitude</label><input type="text" name="latitude" id="editOfficeLat" class="form-control" placeholder="33.8938"></div>
+                        <div><label class="form-label">Longitude</label><input type="text" name="longitude" id="editOfficeLng" class="form-control" placeholder="35.5018"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.75rem">
+                        <div><label class="form-label">Phone</label><input type="text" name="phone" id="editOfficePhone" class="form-control"></div>
+                        <div><label class="form-label">Email</label><input type="email" name="email" id="editOfficeEmail" class="form-control"></div>
+                    </div>
                     <div><label class="form-label">Status</label>
                         <select name="is_active" id="editOfficeStatus" class="form-select">
                             <option value="1">Active</option><option value="0">Inactive</option>
@@ -222,13 +287,132 @@
 
 @push('scripts')
 <script>
-function editOffice(id, name, muniId, active) {
-    document.getElementById('editOfficeForm').action = `/admin/offices/${id}`;
-    document.getElementById('editOfficeName').value  = name;
-    document.getElementById('editOfficeMuni').value  = muniId;
-    document.getElementById('editOfficeStatus').value= active;
-    new bootstrap.Modal(document.getElementById('editOfficeModal')).show();
+const ADMIN_OFFICE_DEFAULT_LOCATION = { lat: 33.8938, lng: 35.5018 };
+const adminOfficeMaps = {};
+let pendingEditOfficeLocation = ADMIN_OFFICE_DEFAULT_LOCATION;
+
+function toOfficeCoordinate(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
 }
+
+function getOfficeLocationFromInputs(latInputId, lngInputId, fallback = ADMIN_OFFICE_DEFAULT_LOCATION) {
+    const lat = toOfficeCoordinate(document.getElementById(latInputId)?.value);
+    const lng = toOfficeCoordinate(document.getElementById(lngInputId)?.value);
+
+    return lat !== null && lng !== null ? { lat, lng } : fallback;
+}
+
+function setOfficeLocationInputs(latInputId, lngInputId, location) {
+    const latInput = document.getElementById(latInputId);
+    const lngInput = document.getElementById(lngInputId);
+
+    if (latInput) latInput.value = location.lat.toFixed(6);
+    if (lngInput) lngInput.value = location.lng.toFixed(6);
+}
+
+function ensureOfficePickerMap(key, mapId, latInputId, lngInputId, fallbackLocation) {
+    if (!window.google?.maps) {
+        const mapEl = document.getElementById(mapId);
+        if (mapEl) {
+            mapEl.innerHTML = '<div class="admin-map-unavailable">Google Maps is not available. Enter coordinates manually.</div>';
+        }
+        return;
+    }
+
+    const mapEl = document.getElementById(mapId);
+    if (!mapEl) return;
+
+    const initialLocation = getOfficeLocationFromInputs(latInputId, lngInputId, fallbackLocation);
+    setOfficeLocationInputs(latInputId, lngInputId, initialLocation);
+
+    if (!adminOfficeMaps[key]) {
+        const map = new google.maps.Map(mapEl, {
+            center: initialLocation,
+            zoom: 14,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+        });
+
+        const marker = new google.maps.Marker({
+            map,
+            position: initialLocation,
+            draggable: true,
+        });
+
+        const updateLocation = (location) => {
+            marker.setPosition(location);
+            map.panTo(location);
+            setOfficeLocationInputs(latInputId, lngInputId, location);
+        };
+
+        map.addListener('click', (event) => {
+            updateLocation({
+                lat: event.latLng.lat(),
+                lng: event.latLng.lng(),
+            });
+        });
+
+        marker.addListener('dragend', (event) => {
+            updateLocation({
+                lat: event.latLng.lat(),
+                lng: event.latLng.lng(),
+            });
+        });
+
+        adminOfficeMaps[key] = { map, marker, updateLocation };
+    } else {
+        adminOfficeMaps[key].updateLocation(initialLocation);
+    }
+
+    setTimeout(() => {
+        google.maps.event.trigger(adminOfficeMaps[key].map, 'resize');
+        adminOfficeMaps[key].map.setCenter(adminOfficeMaps[key].marker.getPosition());
+    }, 120);
+}
+
+window.initAdminOfficeMaps = function () {
+    document.querySelectorAll('.modal.show .admin-office-map').forEach((mapEl) => {
+        if (mapEl.id === 'addOfficeMap') {
+            ensureOfficePickerMap('add', 'addOfficeMap', 'addOfficeLat', 'addOfficeLng', ADMIN_OFFICE_DEFAULT_LOCATION);
+        }
+
+        if (mapEl.id === 'editOfficeMap') {
+            ensureOfficePickerMap('edit', 'editOfficeMap', 'editOfficeLat', 'editOfficeLng', pendingEditOfficeLocation);
+        }
+    });
+};
+
+document.querySelectorAll('.js-edit-office').forEach((button) => {
+    button.addEventListener('click', () => {
+        document.getElementById('editOfficeForm').action = `/admin/offices/${button.dataset.officeId}`;
+        document.getElementById('editOfficeName').value = button.dataset.officeName || '';
+        document.getElementById('editOfficeMuni').value = button.dataset.officeMunicipality || '';
+        document.getElementById('editOfficeAddress').value = button.dataset.officeAddress || '';
+        document.getElementById('editOfficeLat').value = button.dataset.officeLatitude || '';
+        document.getElementById('editOfficeLng').value = button.dataset.officeLongitude || '';
+        document.getElementById('editOfficePhone').value = button.dataset.officePhone || '';
+        document.getElementById('editOfficeEmail').value = button.dataset.officeEmail || '';
+        document.getElementById('editOfficeStatus').value = button.dataset.officeActive || '1';
+
+        const lat = toOfficeCoordinate(button.dataset.officeLatitude);
+        const lng = toOfficeCoordinate(button.dataset.officeLongitude);
+        pendingEditOfficeLocation = lat !== null && lng !== null
+            ? { lat, lng }
+            : ADMIN_OFFICE_DEFAULT_LOCATION;
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editOfficeModal')).show();
+    });
+});
+
+document.getElementById('addOfficeModal')?.addEventListener('shown.bs.modal', () => {
+    ensureOfficePickerMap('add', 'addOfficeMap', 'addOfficeLat', 'addOfficeLng', ADMIN_OFFICE_DEFAULT_LOCATION);
+});
+
+document.getElementById('editOfficeModal')?.addEventListener('shown.bs.modal', () => {
+    ensureOfficePickerMap('edit', 'editOfficeMap', 'editOfficeLat', 'editOfficeLng', pendingEditOfficeLocation);
+});
 
 (function () {
     const url = new URL(window.location.href);
@@ -242,6 +426,12 @@ function editOffice(id, name, muniId, active) {
     history.replaceState({}, '', `${url.pathname}${nextQuery ? `?${nextQuery}` : ''}${url.hash}`);
 })();
 </script>
+@if(config('services.google_maps.api_key'))
+<script
+    async
+    defer
+    src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&callback=initAdminOfficeMaps">
+</script>
+@endif
 @endpush
 @endsection
-

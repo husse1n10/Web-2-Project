@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Events\SupportTicketMessageSent;
 use App\Models\{Municipality, Office, ServiceRequest, SupportTicket, SupportTicketMessage, User};
 use App\Notifications\SupportTicketReplyNotification;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Builder;
@@ -360,6 +361,10 @@ class AdminController extends Controller
             'name'            => 'required|string|max:255',
             'address'         => 'required|string',
             'municipality_id' => 'required|exists:municipalities,id',
+            'latitude'        => 'nullable|numeric',
+            'longitude'       => 'nullable|numeric',
+            'phone'           => 'nullable|string|max:20',
+            'email'           => 'nullable|email',
             'is_active'       => 'boolean',
         ]);
         $office->update($data);
@@ -527,7 +532,35 @@ class AdminController extends Controller
     // Reporting
     public function reports()
     {
-        $requestsByOffice = Office::withCount('requests')
+        return view('admin.reports', $this->buildReportsData());
+    }
+
+    public function exportReportsPdf()
+    {
+        $data = $this->buildReportsData();
+
+        $totalRequests = $data['requestsByStatus']->sum();
+        $completed = $data['requestsByStatus']->get('completed', 0);
+
+        $data += [
+            'generatedAt' => now(),
+            'generatedBy' => auth()->user(),
+            'totalRequests' => $totalRequests,
+            'totalRevenue' => $data['revenueByOffice']->sum('revenue') ?? 0,
+            'completionRate' => $totalRequests > 0 ? round(($completed / $totalRequests) * 100) : 0,
+            'pendingNow' => $data['requestsByStatus']->get('pending', 0),
+        ];
+
+        $pdf = Pdf::loadView('pdf.admin-report', $data)
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('reports-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    private function buildReportsData(): array
+    {
+        $requestsByOffice = Office::with('municipality:id,name')
+            ->withCount('requests')
             ->orderBy('requests_count', 'desc')->get();
 
         $revenueByOffice = Office::withSum(
@@ -538,14 +571,15 @@ class AdminController extends Controller
         $requestsByStatus = ServiceRequest::selectRaw('status, count(*) as total')
             ->groupBy('status')->pluck('total', 'status');
 
-        $monthlyRequests = ServiceRequest::selectRaw('EXTRACT(MONTH FROM created_at) as month, COUNT(*) as total')
-            ->whereYear('created_at', now()->year)
-            ->groupBy('month')->pluck('total', 'month')
-            ->mapWithKeys(fn ($total, $month) => [(int) $month => (int) $total]);
+        $monthlyRequests = ServiceRequest::whereBetween('created_at', [
+                now()->copy()->startOfYear(),
+                now()->copy()->endOfYear(),
+            ])
+            ->get(['created_at'])
+            ->groupBy(fn (ServiceRequest $request) => (int) $request->created_at->month)
+            ->map(fn ($requests) => $requests->count());
 
-        return view('admin.reports', compact(
-            'requestsByOffice', 'revenueByOffice', 'requestsByStatus', 'monthlyRequests'
-        ));
+        return compact('requestsByOffice', 'revenueByOffice', 'requestsByStatus', 'monthlyRequests');
     }
 
     // ── CSV Exports ───────────────────────────────────────────────

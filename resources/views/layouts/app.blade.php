@@ -1917,12 +1917,6 @@
                         <span class="es-nav-badge">{{ $adminOpenTickets }}</span>
                     @endif
                 </a>
-                <a href="{{ Route::has('admin.settings') ? route('admin.settings') : route('security.2fa') }}"
-                   class="es-nav-link {{ request()->routeIs('admin.settings') || request()->routeIs('security.2fa') ? 'active' : '' }}">
-                    <i class="bi bi-gear"></i>
-                    <span class="es-nav-label">Settings</span>
-                </a>
-
             @elseif($user->isOfficeUser())
                 <span class="es-nav-section">Office Panel</span>
 
@@ -2230,6 +2224,8 @@
             @yield('content')
 
         </main>
+
+        @stack('modals')
 
         {{-- Footer --}}
         <footer class="es-footer">

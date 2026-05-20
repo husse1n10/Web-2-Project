@@ -117,6 +117,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::patch('/users/{user}/identity/reject', [AdminController::class, 'rejectCitizenIdentity'])->name('users.identity.reject');
 
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/reports/export/pdf', [AdminController::class, 'exportReportsPdf'])->name('reports.export.pdf');
     Route::get('/reports/export/{type}', [AdminController::class, 'exportReport'])
         ->whereIn('type', ['requests', 'payments', 'offices'])
         ->name('reports.export');

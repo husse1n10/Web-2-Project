@@ -75,6 +75,9 @@
     subtitle="Live operational metrics and request trends across offices." />
 
 <div class="d-flex flex-wrap gap-2 mb-3 admin-reveal">
+    <a href="{{ route('admin.reports.export.pdf') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+    </a>
     <a href="{{ route('admin.reports.export', 'requests') }}" class="btn btn-sm btn-outline-primary">
         <i class="bi bi-download me-1"></i> Export Requests CSV
     </a>
