@@ -64,7 +64,6 @@
 @section('content')
 
 @php
-    $totalRevenue  = $revenueByOffice->sum('revenue') ?? 0;
     $totalRequests = $requestsByStatus->sum();
     $completed     = $requestsByStatus->get('completed', 0);
     $rate          = $totalRequests > 0 ? round(($completed / $totalRequests) * 100) : 0;
@@ -101,8 +100,8 @@
     <div class="col-6 col-xl-3 admin-reveal">
         <x-admin.stat-card
             label="Total Revenue"
-            :value="'$' . number_format($totalRevenue, 0)"
-            subtitle="Collected from paid requests"
+            :value="$formattedTotalRevenue"
+            :subtitle="$revenueCurrencyCount > 1 ? 'Paid request totals by currency' : 'Collected from paid requests'"
             icon="bi-cash-coin"
             color="emerald" />
     </div>
@@ -168,7 +167,7 @@
     <div class="card report-reveal admin-reveal admin-busy-target" id="adminReportsOfficeTableCard">
         <x-admin.table-toolbar
             title="Requests per Office"
-            subtitle="Request volume and revenue by office.">
+            subtitle="Request volume and paid totals by office and currency.">
             <x-slot:actions>
                 <div class="admin-density-switch">
                     <button
@@ -192,7 +191,7 @@
                             <th data-sort="0" data-sort-type="text">Office</th>
                             <th data-sort="1" data-sort-type="text">Municipality</th>
                             <th data-sort="2" data-sort-type="number">Requests</th>
-                            <th data-sort="3" data-sort-type="number">Revenue</th>
+                            <th data-sort="3" data-sort-type="text">Revenue by Currency</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -203,7 +202,7 @@
                             <td>
                                 <span class="report-chip">{{ $office->requests_count }}</span>
                             </td>
-                            <td style="font-weight:600;font-size:.82rem">${{ number_format($revenueByOffice->firstWhere('id', $office->id)?->revenue ?? 0, 2) }}</td>
+                            <td style="font-weight:600;font-size:.82rem">{{ $formattedRevenueByOffice[$office->id] ?? '0' }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="report-empty">No data yet.</td></tr>

@@ -17,8 +17,8 @@
                 <div class="citizen-service-hero-sub">{{ $service->office->name }} &middot; {{ $service->office->municipality->name }}</div>
             </div>
             <div class="citizen-service-hero-price">
-                <div class="citizen-service-hero-amount">${{ number_format($service->price, 2) }}</div>
-                <div class="citizen-service-hero-currency">{{ $service->currency }}</div>
+                <div class="citizen-service-hero-amount">{{ $service->formatted_price_value }}</div>
+                <div class="citizen-service-hero-currency">{{ strtoupper($service->currency ?? 'USD') }}</div>
             </div>
         </div>
         <div class="card-body">
@@ -154,7 +154,7 @@
                     <div class="citizen-service-summary-title">{{ __('Request Summary') }}</div>
                     <div class="citizen-service-summary-row">
                         <span>{{ __('Service fee') }}</span>
-                        <strong>${{ number_format($service->price, 2) }}</strong>
+                        <strong>{{ $service->formatted_price }}</strong>
                     </div>
                     <div class="citizen-service-summary-row">
                         <span>{{ __('Processing time') }}</span>

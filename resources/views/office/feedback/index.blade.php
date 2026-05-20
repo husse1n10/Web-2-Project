@@ -8,7 +8,7 @@
         <span class="card-title">Reviews & Ratings</span>
         <div class="office-feedback-head-score">
             <i class="bi bi-star-fill"></i>
-            <span class="office-feedback-score">{{ number_format($feedback->avg('rating'), 1) }}</span>
+            <span class="office-feedback-score">{{ number_format($averageRating, 1) }}</span>
             <span class="office-feedback-count">({{ $feedback->total() }} reviews)</span>
         </div>
     </div>

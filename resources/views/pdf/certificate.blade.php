@@ -92,7 +92,7 @@
 
         <div class="service-box">
             <div class="svc-label">Service</div>
-            <div class="svc-name">{{ $serviceRequest->service->name }}</div>
+            <div class="svc-name">{{ $serviceRequest->resolved_service_name }}</div>
             <div class="svc-ref">Ref: {{ $serviceRequest->reference_number }}</div>
         </div>
 

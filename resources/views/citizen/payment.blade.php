@@ -14,12 +14,12 @@
                     <i class="bi bi-receipt"></i>
                 </div>
                 <div class="citizen-payment-summary-main">
-                    <div class="citizen-payment-summary-title">{{ $serviceRequest->service->name }}</div>
+                    <div class="citizen-payment-summary-title">{{ $serviceRequest->resolved_service_name }}</div>
                     <div class="citizen-payment-summary-sub">{{ $serviceRequest->office->name }}</div>
                 </div>
                 <div class="citizen-payment-summary-price">
-                    <div class="citizen-payment-summary-amount">${{ number_format($serviceRequest->service->price, 2) }}</div>
-                    <div class="citizen-payment-summary-currency">{{ $serviceRequest->service->currency }}</div>
+                    <div class="citizen-payment-summary-amount">{{ $serviceRequest->formatted_service_price_value }}</div>
+                    <div class="citizen-payment-summary-currency">{{ $serviceRequest->resolved_service_currency }}</div>
                 </div>
             </div>
             <div class="citizen-payment-ref-row">

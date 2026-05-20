@@ -118,8 +118,10 @@
         </td>
         <td>
             <div class="metric-label">Total Revenue</div>
-            <div class="metric-value">${{ number_format((float) $totalRevenue, 0) }}</div>
-            <div class="muted">Collected from paid requests</div>
+            <div class="metric-value">{{ $formattedTotalRevenue }}</div>
+            <div class="muted">
+                {{ $revenueCurrencyCount > 1 ? 'Paid request totals by currency' : 'Collected from paid requests' }}
+            </div>
         </td>
         <td>
             <div class="metric-label">Completion Rate</div>
@@ -162,7 +164,7 @@
                 <th>Office</th>
                 <th>Municipality</th>
                 <th class="text-right">Requests</th>
-                <th class="text-right">Revenue</th>
+                <th>Revenue by Currency</th>
             </tr>
         </thead>
         <tbody>
@@ -171,7 +173,7 @@
                     <td>{{ $office->name }}</td>
                     <td>{{ optional($office->municipality)->name ?? '-' }}</td>
                     <td class="text-right">{{ number_format($office->requests_count) }}</td>
-                    <td class="text-right">${{ number_format((float) ($revenueByOffice->firstWhere('id', $office->id)?->revenue ?? 0), 2) }}</td>
+                    <td>{{ $formattedRevenueByOffice[$office->id] ?? '0' }}</td>
                 </tr>
             @empty
                 <tr>

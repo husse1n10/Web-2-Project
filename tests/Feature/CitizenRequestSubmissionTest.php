@@ -82,6 +82,9 @@ class CitizenRequestSubmissionTest extends TestCase
 
         $this->assertSame('pending', $serviceRequest->status);
         $this->assertSame('unpaid', $serviceRequest->payment_status);
+        $this->assertSame('Birth Certificate', $serviceRequest->service_name);
+        $this->assertSame(10.0, $serviceRequest->service_price);
+        $this->assertSame('USD', $serviceRequest->service_currency);
         $this->assertCount(2, $serviceRequest->documents);
         $this->assertNotNull($serviceRequest->qr_code);
 

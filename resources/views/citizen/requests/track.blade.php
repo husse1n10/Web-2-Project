@@ -433,7 +433,7 @@
             <div class="info-grid">
                 <div class="info-item">
                     <div class="info-label">Service</div>
-                    <div class="info-value">{{ $req->service->name }}</div>
+                    <div class="info-value">{{ $req->resolved_service_name }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Office</div>
@@ -479,5 +479,4 @@
 <footer>&copy; {{ date('Y') }} CedarGov Government Portal</footer>
 </body>
 </html>
-
 

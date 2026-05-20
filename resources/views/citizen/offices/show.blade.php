@@ -5,6 +5,11 @@
 @section('content')
 @php
     $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+    $feedbackFormHasErrors = $errors->has('office_id')
+        || $errors->has('service_request_id')
+        || $errors->has('rating')
+        || $errors->has('comment')
+        || $errors->has('feedback');
 @endphp
 <div class="citizen-office-hero citizen-reveal" data-citizen-reveal>
     <div class="citizen-office-hero-main">
@@ -66,7 +71,7 @@
                         </div>
                     </div>
                     <div class="citizen-office-service-cta">
-                        <div class="citizen-office-service-price">${{ number_format($svc->price, 2) }}</div>
+                        <div class="citizen-office-service-price">{{ $svc->formatted_price }}</div>
                         <a href="{{ route('citizen.services.show', $svc) }}" class="btn btn-primary btn-sm">
                             {{ __('Apply') }}
                         </a>
@@ -96,6 +101,88 @@
                 </a>
             </div>
         @endif
+
+        <div class="card citizen-reveal" data-citizen-reveal>
+            <div class="card-header">
+                <span class="card-title"><i class="bi bi-chat-heart me-2 text-primary"></i>{{ __('Share Your Experience') }}</span>
+            </div>
+            <div class="card-body">
+                @if($feedbackFormHasErrors)
+                    <div class="alert alert-danger" style="font-size:.8rem">
+                        <ul class="mb-0 ps-3">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if($eligibleFeedbackRequests->isNotEmpty())
+                    <p class="citizen-office-feedback-copy">{{ __('Rate this office based on one of your completed requests.') }}</p>
+                    <form action="{{ route('citizen.feedback.submit') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="office_id" value="{{ $office->id }}">
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('Completed Request') }}</label>
+                            <select name="service_request_id" class="form-select" required>
+                                <option value="">{{ __('Select completed request') }}</option>
+                                @foreach($eligibleFeedbackRequests as $eligibleRequest)
+                                    <option value="{{ $eligibleRequest->id }}" @selected((string) old('service_request_id') === (string) $eligibleRequest->id)>
+                                        {{ $eligibleRequest->resolved_service_name }} - {{ $eligibleRequest->reference_number }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('Rating') }}</label>
+                            <select name="rating" class="form-select" required>
+                                <option value="">{{ __('Select rating') }}</option>
+                                <option value="5" @selected(old('rating') == 5)>5 - {{ __('Excellent') }}</option>
+                                <option value="4" @selected(old('rating') == 4)>4 - {{ __('Very Good') }}</option>
+                                <option value="3" @selected(old('rating') == 3)>3 - {{ __('Good') }}</option>
+                                <option value="2" @selected(old('rating') == 2)>2 - {{ __('Fair') }}</option>
+                                <option value="1" @selected(old('rating') == 1)>1 - {{ __('Poor') }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ __('Comment') }}</label>
+                            <textarea name="comment" class="form-control" rows="3" placeholder="{{ __('Tell others about your experience...') }}">{{ old('comment') }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-send me-1"></i> {{ __('Submit Feedback') }}
+                        </button>
+                    </form>
+                @elseif($citizenOfficeFeedbacks->isNotEmpty())
+                    <div class="citizen-office-feedback-note">
+                        <i class="bi bi-check-circle me-1"></i>{{ __('You have already reviewed all completed requests for this office.') }}
+                    </div>
+                    @php($latestFeedback = $citizenOfficeFeedbacks->first())
+                    <div class="citizen-office-my-review">
+                        <div class="citizen-office-review-head">
+                            <span>{{ __('Your latest review') }}</span>
+                            <div class="citizen-office-review-stars">
+                                @for($i = 1; $i <= 5; $i++)
+                                    <i class="bi bi-star{{ $i <= $latestFeedback->rating ? '-fill' : '' }}"></i>
+                                @endfor
+                            </div>
+                        </div>
+                        <div class="citizen-office-feedback-meta">
+                            {{ $latestFeedback->request?->resolved_service_name ?? __('Completed request') }}
+                            @if($latestFeedback->request?->reference_number)
+                                - {{ $latestFeedback->request->reference_number }}
+                            @endif
+                        </div>
+                        @if($latestFeedback->comment)
+                            <p>{{ $latestFeedback->comment }}</p>
+                        @endif
+                    </div>
+                @else
+                    <div class="citizen-office-feedback-note">
+                        <i class="bi bi-info-circle me-1"></i>{{ __('Feedback becomes available after you complete a service request with this office.') }}
+                    </div>
+                @endif
+            </div>
+        </div>
 
         @if($office->working_hours)
             <div class="card citizen-reveal" data-citizen-reveal>
@@ -424,6 +511,36 @@ body.es-role-citizen .citizen-office-book-copy {
     font-size: .8rem;
     color: #64748B;
     margin-bottom: .85rem;
+}
+
+body.es-role-citizen .citizen-office-feedback-copy {
+    font-size: .8rem;
+    color: #64748B;
+    margin-bottom: .85rem;
+}
+
+body.es-role-citizen .citizen-office-feedback-note {
+    padding: .8rem .9rem;
+    border-radius: .7rem;
+    background: rgba(239,246,255,0.65);
+    border: 1px solid rgba(147,197,253,0.45);
+    color: #1D4ED8;
+    font-size: .8rem;
+    line-height: 1.5;
+}
+
+body.es-role-citizen .citizen-office-my-review {
+    margin-top: .85rem;
+    padding: .85rem .95rem;
+    border-radius: .85rem;
+    border: 1px solid #DBEAFE;
+    background: rgba(248,250,252,0.85);
+}
+
+body.es-role-citizen .citizen-office-feedback-meta {
+    margin-top: .25rem;
+    font-size: .72rem;
+    color: #94A3B8;
 }
 
 body.es-role-citizen .citizen-panel-empty {

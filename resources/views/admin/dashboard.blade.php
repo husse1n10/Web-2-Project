@@ -279,16 +279,14 @@
     <div class="col-6 col-lg-3 admin-reveal">
         <x-admin.stat-card
             label="Revenue"
-            :value="'$' . number_format($stats['total_revenue'], 0)"
-            subtitle="Collected from paid requests"
+            :value="$stats['total_revenue_breakdown']"
+            :subtitle="$stats['total_revenue_currency_count'] > 1 ? 'Paid request totals by currency' : 'Collected from paid requests'"
             icon="bi-currency-dollar"
             color="emerald"
             :trend="$trends['total_revenue']['text']"
             :trend-direction="$trends['total_revenue']['direction']"
-            :animate="true"
-            :value-raw="$stats['total_revenue']"
-            value-prefix="$"
-            value-decimals="0" />
+            :trend-label="$stats['total_revenue_currency_count'] > 1 ? 'mixed currencies' : 'vs previous period'"
+        />
     </div>
 </div>
 
@@ -337,7 +335,7 @@
                                         <td><span class="fw-semibold">{{ $request->reference_number }}</span></td>
                                         <td>{{ $request->citizen->name }}</td>
                                         <td>{{ $request->office->name }}</td>
-                                        <td>{{ $request->service->name }}</td>
+                                        <td>{{ $request->resolved_service_name }}</td>
                                         <td><x-status-pill :status="$request->status" /></td>
                                         <td class="admin-muted" data-sort-value="{{ $request->created_at->timestamp }}">{{ $request->created_at->diffForHumans() }}</td>
                                     </tr>

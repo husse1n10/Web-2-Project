@@ -94,7 +94,7 @@
                                 <div class="office-request-citizen">{{ $req->citizen->name }}</div>
                                 <div class="office-request-citizen-email">{{ $req->citizen->email }}</div>
                             </td>
-                            <td class="office-request-service">{{ $req->service->name }}</td>
+                            <td class="office-request-service">{{ $req->resolved_service_name }}</td>
                             <td><x-status-pill :status="$req->status" /></td>
                             <td class="office-request-date">
                                 @if($req->assignee)
@@ -151,7 +151,7 @@
                     <div class="office-request-mobile-name">{{ $req->citizen->name }}</div>
                     <x-status-pill :status="$req->status" />
                 </div>
-                <div class="office-request-mobile-service">{{ $req->service->name }}</div>
+                <div class="office-request-mobile-service">{{ $req->resolved_service_name }}</div>
                 @if(($req->unread_messages_count ?? 0) > 0)
                     <span class="badge bg-danger mb-1">{{ $req->unread_messages_count }} unread</span>
                 @endif

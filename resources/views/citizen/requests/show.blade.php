@@ -5,12 +5,17 @@
 @section('content')
 @php
     $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+    $feedbackFormHasErrors = $errors->has('office_id')
+        || $errors->has('service_request_id')
+        || $errors->has('rating')
+        || $errors->has('comment')
+        || $errors->has('feedback');
 @endphp
 <div class="card mb-3 citizen-reveal" data-citizen-reveal>
     <div class="card-body citizen-request-head">
         <div>
             <span class="citizen-request-head-kicker">{{ __('Service Request') }}</span>
-            <h5 class="citizen-request-head-title">{{ $serviceRequest->service->name }}</h5>
+            <h5 class="citizen-request-head-title">{{ $serviceRequest->resolved_service_name }}</h5>
             <div class="citizen-request-head-sub">{{ $serviceRequest->office->name }}</div>
             <code>{{ $serviceRequest->reference_number }}</code>
         </div>
@@ -189,7 +194,7 @@
             <div class="card-body">
                 <div class="citizen-side-row">
                     <span>{{ __('Amount Due') }}</span>
-                    <strong>${{ number_format($serviceRequest->service->price, 2) }}</strong>
+                    <strong>{{ $serviceRequest->formatted_service_price }}</strong>
                 </div>
                 <div class="citizen-side-row">
                     <span>{{ __('Status') }}</span>
@@ -215,6 +220,16 @@
                     <div class="citizen-paid-ok"><i class="bi bi-check-circle me-1"></i>{{ __('Payment complete') }}</div>
                     <a href="{{ route('citizen.requests.receipt', $serviceRequest) }}" class="btn btn-outline-success w-100">
                         <i class="bi bi-file-earmark-pdf me-1"></i> {{ __('Download Receipt') }}
+                    </a>
+                @endif
+                @if($serviceRequest->canDownloadApprovalLetter())
+                    <a href="{{ route('citizen.requests.pdf', [$serviceRequest, 'approval']) }}" class="btn btn-outline-primary w-100 mt-2">
+                        <i class="bi bi-patch-check me-1"></i> {{ __('Download Approval Letter') }}
+                    </a>
+                @endif
+                @if($serviceRequest->canDownloadCertificate())
+                    <a href="{{ route('citizen.requests.pdf', [$serviceRequest, 'certificate']) }}" class="btn btn-outline-primary w-100 mt-2">
+                        <i class="bi bi-award me-1"></i> {{ __('Download Certificate') }}
                     </a>
                 @endif
             </div>
@@ -251,7 +266,34 @@
                     <span class="card-title"><i class="bi bi-star me-2 text-primary"></i>{{ __('Feedback') }}</span>
                 </div>
                 <div class="card-body">
-                    @if($errors->any())
+                    @if($serviceRequest->feedback)
+                        <div class="citizen-feedback-summary">
+                            <div class="citizen-feedback-summary-head">
+                                <span>{{ __('Your Review') }}</span>
+                                <div class="citizen-feedback-stars">
+                                    @for($i = 1; $i <= 5; $i++)
+                                        <i class="bi bi-star{{ $i <= $serviceRequest->feedback->rating ? '-fill' : '' }}"></i>
+                                    @endfor
+                                </div>
+                            </div>
+                            @if($serviceRequest->feedback->comment)
+                                <p>{{ $serviceRequest->feedback->comment }}</p>
+                            @else
+                                <p class="mb-0">{{ __('You rated this office without leaving a written comment.') }}</p>
+                            @endif
+
+                            @if($serviceRequest->feedback->office_reply)
+                                <div class="citizen-feedback-reply">
+                                    <div class="citizen-feedback-reply-title">
+                                        {{ __('Office Reply') }}
+                                        <span>{{ $serviceRequest->feedback->reply_is_public ? __('Public') : __('Private to you') }}</span>
+                                    </div>
+                                    <p>{{ $serviceRequest->feedback->office_reply }}</p>
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                    @if($feedbackFormHasErrors)
                         <div class="alert alert-danger" style="font-size:.8rem">
                             <ul class="mb-0 ps-3">
                                 @foreach($errors->all() as $error)
@@ -270,23 +312,24 @@
                             <label class="form-label">{{ __('Rating') }}</label>
                             <select name="rating" class="form-select" required>
                                 <option value="">{{ __('Select rating') }}</option>
-                                <option value="5">5 - {{ __('Excellent') }}</option>
-                                <option value="4">4 - {{ __('Very Good') }}</option>
-                                <option value="3">3 - {{ __('Good') }}</option>
-                                <option value="2">2 - {{ __('Fair') }}</option>
-                                <option value="1">1 - {{ __('Poor') }}</option>
+                                <option value="5" @selected(old('rating') == 5)>5 - {{ __('Excellent') }}</option>
+                                <option value="4" @selected(old('rating') == 4)>4 - {{ __('Very Good') }}</option>
+                                <option value="3" @selected(old('rating') == 3)>3 - {{ __('Good') }}</option>
+                                <option value="2" @selected(old('rating') == 2)>2 - {{ __('Fair') }}</option>
+                                <option value="1" @selected(old('rating') == 1)>1 - {{ __('Poor') }}</option>
                             </select>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label">{{ __('Comment') }}</label>
-                            <textarea name="comment" class="form-control" rows="3" placeholder="{{ __('Write your feedback...') }}"></textarea>
+                            <textarea name="comment" class="form-control" rows="3" placeholder="{{ __('Write your feedback...') }}">{{ old('comment') }}</textarea>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-sm w-100">
                             <i class="bi bi-send me-1"></i> {{ __('Submit Feedback') }}
                         </button>
                     </form>
+                    @endif
                 </div>
             </div>
         @endif
@@ -650,6 +693,61 @@ body.es-role-citizen .citizen-paid-ok {
     background: rgba(236,253,245,0.5);
     border-radius: .5rem;
     border: 1px solid rgba(16,185,129,0.15);
+}
+
+body.es-role-citizen .citizen-feedback-summary {
+    padding: .9rem 1rem;
+    border-radius: .85rem;
+    border: 1px solid rgba(191,219,254,0.8);
+    background: rgba(248,250,252,0.8);
+}
+
+body.es-role-citizen .citizen-feedback-summary-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .55rem;
+    font-size: .84rem;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+body.es-role-citizen .citizen-feedback-stars {
+    display: inline-flex;
+    gap: 2px;
+    color: #F59E0B;
+    font-size: .75rem;
+}
+
+body.es-role-citizen .citizen-feedback-summary p {
+    margin: 0;
+    font-size: .8rem;
+    color: #475569;
+    line-height: 1.55;
+}
+
+body.es-role-citizen .citizen-feedback-reply {
+    margin-top: .8rem;
+    padding: .72rem .85rem;
+    border-radius: .72rem;
+    border-left: 3px solid #10B981;
+    background: rgba(236,253,245,0.7);
+}
+
+body.es-role-citizen .citizen-feedback-reply-title {
+    display: flex;
+    justify-content: space-between;
+    gap: .5rem;
+    font-size: .72rem;
+    font-weight: 700;
+    color: #047857;
+    margin-bottom: .25rem;
+}
+
+body.es-role-citizen .citizen-feedback-reply-title span {
+    color: #94A3B8;
+    font-weight: 600;
 }
 
 body.es-role-citizen .citizen-panel-empty {

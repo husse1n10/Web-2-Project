@@ -68,10 +68,10 @@
                     @forelse($requests as $req)
                         <tr>
                             <td><code>{{ $req->reference_number }}</code></td>
-                            <td class="fw-semibold" style="font-size:.84rem;">{{ $req->service->name }}</td>
+                            <td class="fw-semibold" style="font-size:.84rem;">{{ $req->resolved_service_name }}</td>
                             <td class="text-muted" style="font-size:.79rem;">{{ $req->office->name }}</td>
                             <td class="fw-semibold">
-                                ${{ number_format($req->amount_paid ?? $req->service->price, 2) }}
+                                {{ $req->formatted_recorded_amount }}
                             </td>
                             <td style="font-size:.79rem;">
                                 @if($req->payment_method)
@@ -127,12 +127,12 @@
                     <i class="bi {{ $req->payment_status === 'paid' ? 'bi-check-circle' : 'bi-hourglass-split' }}"></i>
                 </div>
                 <div class="citizen-pay-mobile-main">
-                    <div class="citizen-pay-mobile-title">{{ $req->service->name }}</div>
+                    <div class="citizen-pay-mobile-title">{{ $req->resolved_service_name }}</div>
                     <div class="citizen-pay-mobile-sub">{{ $req->office->name }}</div>
                     <code style="font-size:.68rem;">{{ $req->reference_number }}</code>
                 </div>
                 <div class="citizen-pay-mobile-end">
-                    <div class="citizen-pay-mobile-amount">${{ number_format($req->amount_paid ?? $req->service->price, 2) }}</div>
+                    <div class="citizen-pay-mobile-amount">{{ $req->formatted_recorded_amount }}</div>
                     <x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" />
                 </div>
             </div>

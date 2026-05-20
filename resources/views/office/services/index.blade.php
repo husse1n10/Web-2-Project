@@ -3,6 +3,8 @@
 @section('page-title', 'Services')
 
 @section('content')
+@php($serviceCurrencies = ['USD', 'LBP', 'EUR'])
+
 <div class="office-service-head office-reveal" data-office-reveal>
     <div>
         <h5 class="office-service-title">Manage Services</h5>
@@ -37,7 +39,7 @@
                                 @endif
                             </td>
                             <td class="office-service-category">{{ $svc->category->name ?? '-' }}</td>
-                            <td class="office-service-price">${{ number_format($svc->price, 2) }}</td>
+                            <td class="office-service-price">{{ $svc->formatted_price }}</td>
                             <td class="office-service-duration">{{ $svc->estimated_duration_days }} day(s)</td>
                             <td>
                                 <x-status-pill :status="$svc->is_active ? 'approved' : 'rejected'" />
@@ -51,6 +53,7 @@
                                         data-service-id="{{ $svc->id }}"
                                         data-service-name="{{ $svc->name }}"
                                         data-service-price="{{ $svc->price }}"
+                                        data-service-currency="{{ strtoupper($svc->currency ?? 'USD') }}"
                                         data-service-duration="{{ $svc->estimated_duration_days }}"
                                         data-service-active="{{ $svc->is_active ? 1 : 0 }}"
                                     >
@@ -87,7 +90,7 @@
                     </div>
                     <div class="office-service-mobile-main">
                         <div class="office-service-mobile-name">{{ $svc->name }}</div>
-                        <div class="office-service-mobile-meta">${{ number_format($svc->price, 2) }} &middot; {{ $svc->estimated_duration_days }}d</div>
+                        <div class="office-service-mobile-meta">{{ $svc->formatted_price }} &middot; {{ $svc->estimated_duration_days }}d</div>
                     </div>
                     <x-status-pill :status="$svc->is_active ? 'approved' : 'rejected'" />
                 </div>
@@ -134,9 +137,9 @@
                         <div>
                             <label class="form-label">Currency</label>
                             <select name="currency" class="form-select">
-                                <option>USD</option>
-                                <option>LBP</option>
-                                <option>EUR</option>
+                                @foreach($serviceCurrencies as $currency)
+                                    <option value="{{ $currency }}">{{ $currency }}</option>
+                                @endforeach
                             </select>
                         </div>
                     </div>
@@ -195,16 +198,26 @@
                             <input type="number" name="price" id="esPrice" class="form-control" min="0" step="0.01" required>
                         </div>
                         <div>
+                            <label class="form-label">Currency</label>
+                            <select name="currency" id="esCurrency" class="form-select">
+                                @foreach($serviceCurrencies as $currency)
+                                    <option value="{{ $currency }}">{{ $currency }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="office-modal-grid mb-3">
+                        <div>
                             <label class="form-label">Duration (days)</label>
                             <input type="number" name="estimated_duration_days" id="esDuration" class="form-control" min="1">
                         </div>
-                    </div>
-                    <div>
-                        <label class="form-label">Status</label>
-                        <select name="is_active" id="esActive" class="form-select">
-                            <option value="1">Active</option>
-                            <option value="0">Inactive</option>
-                        </select>
+                        <div>
+                            <label class="form-label">Status</label>
+                            <select name="is_active" id="esActive" class="form-select">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer office-modal-footer">
@@ -330,10 +343,11 @@ function addDoc() {
     wrap.appendChild(row);
 }
 
-function editService(id, name, price, duration, active) {
+function editService(id, name, price, currency, duration, active) {
     document.getElementById('editSvcForm').action = `/office/services/${id}`;
     document.getElementById('esName').value = name;
     document.getElementById('esPrice').value = price;
+    document.getElementById('esCurrency').value = currency;
     document.getElementById('esDuration').value = duration;
     document.getElementById('esActive').value = active;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('editSvcModal')).show();
@@ -345,6 +359,7 @@ document.querySelectorAll('[data-edit-service]').forEach((button) => {
             button.dataset.serviceId,
             button.dataset.serviceName,
             button.dataset.servicePrice,
+            button.dataset.serviceCurrency,
             button.dataset.serviceDuration,
             button.dataset.serviceActive
         );

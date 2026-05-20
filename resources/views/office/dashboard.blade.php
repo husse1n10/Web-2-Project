@@ -17,7 +17,7 @@
                 <div class="office-hero-panel">
                     <div class="office-hero-panel-label">Completed This Month</div>
                     <div class="office-hero-panel-value" data-office-counter="{{ $stats['completed_this_month'] }}">{{ $stats['completed_this_month'] }}</div>
-                    <div class="office-hero-panel-sub">Revenue: ${{ number_format($stats['revenue'], 2) }}</div>
+                    <div class="office-hero-panel-sub">Revenue: {{ $stats['revenue_breakdown'] }}</div>
                 </div>
             </div>
         </div>
@@ -147,7 +147,7 @@
                                     <tr>
                                         <td><span class="fw-semibold">{{ $request->reference_number }}</span></td>
                                         <td>{{ $request->citizen->name }}</td>
-                                        <td>{{ $request->service->name }}</td>
+                                        <td>{{ $request->resolved_service_name }}</td>
                                         <td><x-status-pill :status="$request->status" /></td>
                                         <td class="text-end">
                                             <a href="{{ route('office.requests.show', $request) }}" class="btn btn-sm btn-outline-primary">Open</a>

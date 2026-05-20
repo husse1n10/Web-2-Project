@@ -24,13 +24,23 @@ class OfficeController extends Controller
     public function dashboard()
     {
         $office = $this->currentOffice();
+        $revenueTotals = $office->requests()
+            ->where('service_requests.payment_status', 'paid')
+            ->selectRaw("UPPER(COALESCE(service_requests.service_currency, 'USD')) as currency")
+            ->selectRaw('SUM(COALESCE(service_requests.amount_paid, service_requests.service_price, 0)) as total')
+            ->groupBy('currency')
+            ->orderBy('currency')
+            ->pluck('total', 'currency')
+            ->map(fn ($total) => (float) $total);
 
         $stats = [
             'pending'              => $office->requests()->where('status', 'pending')->count(),
             'in_review'            => $office->requests()->where('status', 'in_review')->count(),
             'completed_this_month' => $office->requests()->where('status', 'completed')
-                                            ->whereMonth('updated_at', now()->month)->count(),
-            'revenue'              => $office->requests()->where('payment_status', 'paid')->sum('amount_paid'),
+                                            ->whereYear('completed_at', now()->year)
+                                            ->whereMonth('completed_at', now()->month)
+                                            ->count(),
+            'revenue_breakdown'    => Service::formatCurrencyBreakdown($revenueTotals),
             'avg_rating'           => $office->feedbacks()->avg('rating') ?? 0,
             'pending_today'        => $office->requests()->whereDate('created_at', today())->count(),
         ];
@@ -114,6 +124,7 @@ class OfficeController extends Controller
         $data = $request->validate([
             'name'                    => 'required|string|max:255',
             'price'                   => 'required|numeric|decimal:0,2',
+            'currency'                => 'required|string|max:5',
             'estimated_duration_days' => 'required|integer|min:1',
             'is_active'               => 'boolean',
         ]);
@@ -286,7 +297,9 @@ class OfficeController extends Controller
     {
         $office   = $this->currentOffice();
         $feedback = $office->feedbacks()->with('citizen')->latest()->paginate(15);
-        return view('office.feedback.index', compact('feedback'));
+        $averageRating = (float) ($office->feedbacks()->avg('rating') ?? 0);
+
+        return view('office.feedback.index', compact('feedback', 'averageRating'));
     }
 
     public function replyFeedback(Request $request, Feedback $feedback)
@@ -347,6 +360,13 @@ class OfficeController extends Controller
     {
         $this->authorizeOfficeOwnership($serviceRequest->office_id);
         $svc = app(\App\Services\PdfService::class);
+
+        abort_unless(match ($type) {
+            'receipt' => $serviceRequest->canDownloadReceipt(),
+            'approval' => $serviceRequest->canDownloadApprovalLetter(),
+            'certificate' => $serviceRequest->canDownloadCertificate(),
+            default => false,
+        }, 403);
 
         $path = match ($type) {
             'receipt'     => $svc->generateReceipt($serviceRequest),

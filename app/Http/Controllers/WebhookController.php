@@ -71,19 +71,33 @@ class WebhookController extends Controller
         }
 
         // Amount check — make sure NOWPayments charged the expected USD amount.
-        $expectedUsd = (float) $serviceRequest->service->price;
-        $reportedUsd = (float) ($payload['price_amount'] ?? 0);
-        if ($reportedUsd > 0 && abs($reportedUsd - $expectedUsd) > 0.01) {
+        $expectedAmount = $serviceRequest->resolved_service_price;
+        $expectedCurrency = strtolower($serviceRequest->resolved_service_currency);
+        $reportedAmount = (float) ($payload['price_amount'] ?? 0);
+        $reportedCurrency = strtolower((string) ($payload['price_currency'] ?? ''));
+
+        if ($reportedCurrency !== '' && $reportedCurrency !== $expectedCurrency) {
+            Log::warning('NOWPayments webhook: currency mismatch.', [
+                'order_id' => $orderId,
+                'expected_currency' => $expectedCurrency,
+                'reported_currency' => $reportedCurrency,
+            ]);
+
+            return response()->json(['ok' => true, 'note' => 'currency_mismatch']);
+        }
+
+        if ($reportedAmount > 0 && abs($reportedAmount - $expectedAmount) > 0.01) {
             Log::warning('NOWPayments webhook: amount mismatch.', [
                 'order_id'    => $orderId,
-                'expected'    => $expectedUsd,
-                'reported'    => $reportedUsd,
+                'expected'    => $expectedAmount,
+                'reported'    => $reportedAmount,
             ]);
             // 200 so NOWPayments doesn't retry. We just refuse to mark paid.
             return response()->json(['ok' => true, 'note' => 'amount_mismatch']);
         }
 
         $serviceRequest->update([
+            'amount_paid' => $serviceRequest->resolved_service_price,
             'payment_status' => 'paid',
             'payment_method' => 'crypto',
             'transaction_id' => $payload['payment_id'] ?? $serviceRequest->transaction_id,
@@ -163,7 +177,7 @@ class WebhookController extends Controller
         }
 
         // Amount-check defense: session amount_total must match service price * 100 (cents).
-        $expectedCents = PaymentService::toMinorUnit($serviceRequest->service->price);
+        $expectedCents = PaymentService::toMinorUnit($serviceRequest->resolved_service_price);
         $actualCents   = (int) ($session->amount_total ?? 0);
         if ($actualCents !== $expectedCents) {
             Log::warning('Stripe webhook: amount mismatch.', [
@@ -174,7 +188,19 @@ class WebhookController extends Controller
             return response()->json(['ok' => true, 'note' => 'amount_mismatch']);
         }
 
+        $expectedCurrency = strtolower($serviceRequest->resolved_service_currency);
+        $actualCurrency = strtolower((string) ($session->currency ?? ''));
+        if ($actualCurrency !== '' && $actualCurrency !== $expectedCurrency) {
+            Log::warning('Stripe webhook: currency mismatch.', [
+                'service_request_id' => $serviceRequestId,
+                'expected_currency'  => $expectedCurrency,
+                'actual_currency'    => $actualCurrency,
+            ]);
+            return response()->json(['ok' => true, 'note' => 'currency_mismatch']);
+        }
+
         $serviceRequest->update([
+            'amount_paid' => $serviceRequest->resolved_service_price,
             'payment_status' => 'paid',
             'payment_method' => 'card',
             'transaction_id' => $session->payment_intent ?? $serviceRequest->transaction_id,

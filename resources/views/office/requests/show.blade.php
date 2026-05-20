@@ -3,12 +3,43 @@
 @section('page-title', 'Request Details')
 
 @section('content')
+@php
+    $pdfDownloads = [
+        [
+            'type' => 'receipt',
+            'label' => 'Payment Receipt',
+            'icon' => 'bi-receipt',
+            'enabled' => $serviceRequest->canDownloadReceipt(),
+            'hint' => $serviceRequest->canDownloadReceipt()
+                ? 'Available because payment has been completed.'
+                : 'Available after the payment status is marked paid.',
+        ],
+        [
+            'type' => 'approval',
+            'label' => 'Approval Letter',
+            'icon' => 'bi-patch-check',
+            'enabled' => $serviceRequest->canDownloadApprovalLetter(),
+            'hint' => $serviceRequest->canDownloadApprovalLetter()
+                ? 'Available because the request has been approved.'
+                : 'Available once the request status becomes approved.',
+        ],
+        [
+            'type' => 'certificate',
+            'label' => 'Completion Certificate',
+            'icon' => 'bi-award',
+            'enabled' => $serviceRequest->canDownloadCertificate(),
+            'hint' => $serviceRequest->canDownloadCertificate()
+                ? 'Available because the request has been completed.'
+                : 'Available once the request status becomes completed.',
+        ],
+    ];
+@endphp
 <div class="card office-request-head-card office-reveal" data-office-reveal>
     <div class="card-body">
         <div class="office-request-head-wrap">
             <div class="office-request-head-main">
                 <span class="office-request-kicker">Service Request</span>
-                <h5 class="office-request-title">{{ $serviceRequest->service->name }}</h5>
+                <h5 class="office-request-title">{{ $serviceRequest->resolved_service_name }}</h5>
                 <div class="office-request-meta">
                     <span><i class="bi bi-person me-1"></i>{{ $serviceRequest->citizen->name }}</span>
                     <span class="office-request-dot"></span>
@@ -233,7 +264,7 @@
             <div class="card-body">
                 <div class="office-side-row">
                     <span>Amount</span>
-                    <strong>${{ number_format($serviceRequest->service->price, 2) }}</strong>
+                    <strong>{{ $serviceRequest->formatted_recorded_amount }}</strong>
                 </div>
                 <div class="office-side-row">
                     <span>Method</span>
@@ -249,6 +280,28 @@
                         <code>{{ $serviceRequest->transaction_id }}</code>
                     </div>
                 @endif
+            </div>
+        </div>
+
+        <div class="card office-reveal" data-office-reveal>
+            <div class="card-header">
+                <span class="card-title"><i class="bi bi-file-earmark-pdf me-2 text-primary"></i>PDF Documents</span>
+            </div>
+            <div class="card-body">
+                @foreach($pdfDownloads as $pdf)
+                    <div class="office-pdf-item">
+                        @if($pdf['enabled'])
+                            <a href="{{ route('office.requests.pdf', [$serviceRequest, $pdf['type']]) }}" class="btn btn-outline-primary w-100 office-pdf-btn">
+                                <i class="bi {{ $pdf['icon'] }} me-1"></i> {{ $pdf['label'] }}
+                            </a>
+                        @else
+                            <button type="button" class="btn btn-outline-secondary w-100 office-pdf-btn" disabled>
+                                <i class="bi {{ $pdf['icon'] }} me-1"></i> {{ $pdf['label'] }}
+                            </button>
+                        @endif
+                        <div class="office-pdf-hint">{{ $pdf['hint'] }}</div>
+                    </div>
+                @endforeach
             </div>
         </div>
 
@@ -427,6 +480,14 @@ body.es-role-office_user .office-citizen-avatar {
 body.es-role-office_user .office-citizen-name { font-size: .84rem; font-weight: 700; color: #0F172A; }
 body.es-role-office_user .office-citizen-email { font-size: .73rem; color: #64748B; }
 body.es-role-office_user .office-citizen-phone { font-size: .78rem; color: #475569; }
+body.es-role-office_user .office-pdf-item + .office-pdf-item { margin-top: .65rem; }
+body.es-role-office_user .office-pdf-btn { font-weight: 600; }
+body.es-role-office_user .office-pdf-hint {
+    margin-top: .28rem;
+    font-size: .7rem;
+    color: #64748B;
+    line-height: 1.45;
+}
 
 @media (min-width: 992px) {
     body.es-role-office_user .office-request-detail-grid { grid-template-columns: minmax(0, 1fr) 320px; }

@@ -40,16 +40,20 @@ class PaymentService
     private function processCard(ServiceRequest $req, array $payload): array
     {
         try {
+            $serviceCurrency = strtolower($req->resolved_service_currency);
+            $serviceName = $req->resolved_service_name;
+            $servicePrice = $req->resolved_service_price;
+
             $session = StripeSession::create([
                 'payment_method_types' => ['card'],
                 'line_items' => [[
                     'price_data' => [
-                        'currency'     => strtolower($req->service->currency ?? 'usd'),
+                        'currency'     => $serviceCurrency,
                         'product_data' => [
-                            'name'        => $req->service->name,
+                            'name'        => $serviceName,
                             'description' => 'Service Request: ' . $req->reference_number,
                         ],
-                        'unit_amount' => self::toMinorUnit($req->service->price),
+                        'unit_amount' => self::toMinorUnit($servicePrice),
                     ],
                     'quantity' => 1,
                 ]],
@@ -93,9 +97,14 @@ class PaymentService
 
             // Confirm the amount paid matches the expected price to prevent
             // a $1 session being replayed against a $1000 request.
-            $expectedCents = self::toMinorUnit($req->service->price);
+            $expectedCents = self::toMinorUnit($req->resolved_service_price);
             if ((int) $session->amount_total !== $expectedCents) {
                 return ['success' => false, 'message' => 'Payment amount does not match the request price.'];
+            }
+
+            $expectedCurrency = strtolower($req->resolved_service_currency);
+            if (strtolower((string) ($session->currency ?? '')) !== $expectedCurrency) {
+                return ['success' => false, 'message' => 'Payment currency does not match the request.'];
             }
 
             return [
@@ -115,6 +124,8 @@ class PaymentService
     {
         $apiKey  = config('services.nowpayments.api_key');
         $baseUrl = rtrim((string) config('services.nowpayments.base_url'), '/');
+        $servicePrice = $req->resolved_service_price;
+        $serviceCurrency = strtolower($req->resolved_service_currency);
 
         if (empty($apiKey)) {
             return [
@@ -130,8 +141,8 @@ class PaymentService
                 ])
                 ->timeout(20)
                 ->post("{$baseUrl}/invoice", [
-                    'price_amount'      => (float) $req->service->price,
-                    'price_currency'    => strtolower($req->service->currency ?? 'usd'),
+                    'price_amount'      => (float) $servicePrice,
+                    'price_currency'    => $serviceCurrency,
                     'pay_currency'      => strtolower($payload['crypto_currency'] ?? 'btc'),
                     'order_id'          => (string) $req->id,
                     'order_description' => 'Service Request: ' . $req->reference_number,

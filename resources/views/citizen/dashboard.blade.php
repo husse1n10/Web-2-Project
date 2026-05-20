@@ -210,7 +210,7 @@
                                 @foreach($requests->take(8) as $request)
                                     <tr>
                                         <td><span class="fw-semibold">{{ $request->reference_number }}</span></td>
-                                        <td>{{ $request->service->name }}</td>
+                                        <td>{{ $request->resolved_service_name }}</td>
                                         <td>{{ $request->office->name }}</td>
                                         <td><x-status-pill :status="$request->status" /></td>
                                         <td><x-status-pill :status="$request->payment_status" /></td>

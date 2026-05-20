@@ -353,10 +353,10 @@
                             <i class="bi bi-check-circle-fill"></i>
                         </div>
                         <div class="citizen-activity-main">
-                            <div class="citizen-activity-title">{{ $pr->service->name }}</div>
+                            <div class="citizen-activity-title">{{ $pr->resolved_service_name }}</div>
                             <div class="citizen-activity-sub">{{ $pr->office->name }} &middot; {{ ucfirst($pr->payment_method ?? 'card') }} &middot; {{ $pr->updated_at->format('M d, Y') }}</div>
                         </div>
-                        <div class="citizen-activity-amount">${{ number_format($pr->amount_paid, 2) }}</div>
+                        <div class="citizen-activity-amount">{{ $pr->formatted_recorded_amount }}</div>
                     </a>
                 @empty
                     <div class="citizen-panel-empty">
@@ -379,7 +379,7 @@
                             <i class="bi bi-file-text"></i>
                         </div>
                         <div class="citizen-activity-main">
-                            <div class="citizen-activity-title">{{ $req->service->name }}</div>
+                            <div class="citizen-activity-title">{{ $req->resolved_service_name }}</div>
                             <div class="citizen-activity-sub">{{ $req->office->name }} &middot; {{ $req->created_at->diffForHumans() }}</div>
                         </div>
                         <x-status-pill :status="$req->status" />

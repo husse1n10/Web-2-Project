@@ -98,7 +98,7 @@
                     @forelse($requests as $req)
                         <tr>
                             <td><code>{{ $req->reference_number }}</code></td>
-                            <td class="citizen-request-service">{{ $req->service->name }}</td>
+                            <td class="citizen-request-service">{{ $req->resolved_service_name }}</td>
                             <td class="citizen-request-office">{{ $req->office->name }}</td>
                             <td><x-status-pill :status="$req->status" /></td>
                             <td><x-status-pill :status="$req->payment_status === 'paid' ? 'paid' : 'unpaid'" /></td>
@@ -142,7 +142,7 @@
                     <i class="bi bi-file-earmark-text"></i>
                 </div>
                 <div class="citizen-request-mobile-main">
-                    <div class="citizen-request-mobile-title">{{ $req->service->name }}</div>
+                    <div class="citizen-request-mobile-title">{{ $req->resolved_service_name }}</div>
                     <div class="citizen-request-mobile-sub">{{ $req->office->name }}</div>
                     @if(($req->unread_messages_count ?? 0) > 0)
                         <span class="badge bg-danger mt-1">{{ $req->unread_messages_count }} unread</span>

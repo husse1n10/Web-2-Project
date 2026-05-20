@@ -230,6 +230,9 @@ Route::middleware(['auth', 'role:citizen'])->prefix('citizen')->name('citizen.')
 
     // PDF receipt download
     Route::get('/requests/{serviceRequest}/receipt', [CitizenController::class, 'downloadReceipt'])->name('requests.receipt');
+    Route::get('/requests/{serviceRequest}/pdf/{type}', [CitizenController::class, 'downloadPdf'])
+        ->whereIn('type', ['approval', 'certificate'])
+        ->name('requests.pdf');
 
     // AI chatbot — 30 req/min per citizen
     Route::post('/chatbot', [CitizenController::class, 'chatbotAsk'])->middleware('throttle:30,1')->name('chatbot.ask');

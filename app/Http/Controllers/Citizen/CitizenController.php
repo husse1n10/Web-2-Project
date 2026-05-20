@@ -10,6 +10,7 @@ use App\Notifications\NewSupportTicketNotification;
 use App\Notifications\PhoneVerificationNotification;
 use App\Notifications\RequestResubmitted;
 use App\Notifications\SupportTicketReplyNotification;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use App\Services\{ChatbotService, QrCodeService, PaymentService, PdfService};
@@ -239,8 +240,27 @@ class CitizenController extends Controller
 
     public function showOffice(Office $office)
     {
-        $office->load(['services.category', 'feedbacks' => fn ($q) => $q->latest()->limit(5)]);
-        return view('citizen.offices.show', compact('office'));
+        $office->load([
+            'services.category',
+            'feedbacks' => fn ($q) => $q->with('citizen')->latest()->limit(5),
+        ]);
+
+        $eligibleFeedbackRequests = Auth::user()->serviceRequests()
+            ->with('service')
+            ->where('office_id', $office->id)
+            ->where('status', 'completed')
+            ->whereDoesntHave('feedback')
+            ->latest('completed_at')
+            ->latest('id')
+            ->get();
+
+        $citizenOfficeFeedbacks = Auth::user()->feedbacks()
+            ->with('request.service')
+            ->where('office_id', $office->id)
+            ->latest()
+            ->get();
+
+        return view('citizen.offices.show', compact('office', 'eligibleFeedbackRequests', 'citizenOfficeFeedbacks'));
     }
 
     // ── Service Request ───────────────────────────────────────────
@@ -282,6 +302,9 @@ class CitizenController extends Controller
                 'citizen_id'       => Auth::id(),
                 'service_id'       => $service->id,
                 'office_id'        => $service->office_id,
+                'service_name'     => $service->name,
+                'service_price'    => $service->price,
+                'service_currency' => strtoupper($service->currency ?? 'USD'),
                 'notes'            => $request->notes,
                 'amount_paid'      => $service->price,
                 'due_at'           => now()->addDays($sla),
@@ -356,6 +379,7 @@ class CitizenController extends Controller
 
             if ($verified['success']) {
                 $serviceRequest->update([
+                    'amount_paid' => $serviceRequest->resolved_service_price,
                     'payment_status' => 'paid',
                     'transaction_id' => $verified['transaction_id'],
                 ]);
@@ -416,6 +440,7 @@ class CitizenController extends Controller
         if ($search = trim((string) $request->search)) {
             $query->where(function ($builder) use ($search) {
                 $builder->where('reference_number', 'like', "%{$search}%")
+                    ->orWhere('service_name', 'like', "%{$search}%")
                     ->orWhereHas('service', fn ($serviceQuery) => $serviceQuery->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('office', fn ($officeQuery) => $officeQuery->where('name', 'like', "%{$search}%"));
             });
@@ -444,7 +469,7 @@ class CitizenController extends Controller
             event(new MessagesRead($serviceRequest->id, $readMessageIds, Auth::id()));
         }
 
-        $serviceRequest->load(['service', 'office', 'documents', 'statusLogs.changedBy', 'messages.sender', 'appointment']);
+        $serviceRequest->load(['service', 'office', 'documents', 'statusLogs.changedBy', 'messages.sender', 'appointment', 'feedback']);
 
         return view('citizen.requests.show', compact('serviceRequest'));
     }
@@ -523,13 +548,34 @@ class CitizenController extends Controller
     public function downloadReceipt(ServiceRequest $serviceRequest)
     {
         abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
-        abort_unless($serviceRequest->payment_status === 'paid', 403);
+        abort_unless($serviceRequest->canDownloadReceipt(), 403);
 
         $path = app(PdfService::class)->generateReceipt($serviceRequest);
         return app(PdfService::class)->stream($path, "receipt-{$serviceRequest->reference_number}.pdf");
     }
 
     // ── Appointments ──────────────────────────────────────────────
+    public function downloadPdf(ServiceRequest $serviceRequest, string $type)
+    {
+        abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
+
+        $svc = app(PdfService::class);
+
+        abort_unless(match ($type) {
+            'approval' => $serviceRequest->canDownloadApprovalLetter(),
+            'certificate' => $serviceRequest->canDownloadCertificate(),
+            default => false,
+        }, 403);
+
+        $path = match ($type) {
+            'approval' => $svc->generateApprovalLetter($serviceRequest),
+            'certificate' => $svc->generateCertificate($serviceRequest),
+            default => abort(404),
+        };
+
+        return $svc->stream($path, "{$type}-{$serviceRequest->reference_number}.pdf");
+    }
+
     public function availableSlots(Office $office, Request $request)
     {
         $data = $request->validate([
@@ -626,24 +672,55 @@ class CitizenController extends Controller
     {
         $data = $request->validate([
             'office_id'          => 'required|exists:offices,id',
-            'service_request_id' => 'nullable|exists:service_requests,id',
+            'service_request_id' => 'required|exists:service_requests,id',
             'rating'             => 'required|integer|min:1|max:5',
             'comment'            => 'nullable|string|max:1000',
         ]);
 
-        if (!empty($data['service_request_id'])) {
-            $alreadyExists = Feedback::where('citizen_id', Auth::id())
-                ->where('service_request_id', $data['service_request_id'])
-                ->exists();
+        $serviceRequest = ServiceRequest::whereKey($data['service_request_id'])
+            ->where('citizen_id', Auth::id())
+            ->where('office_id', $data['office_id'])
+            ->first();
 
-            if ($alreadyExists) {
-                return back()->withErrors([
-                    'feedback' => 'You have already submitted feedback for this request.'
-                ])->withInput();
-            }
+        if (!$serviceRequest) {
+            return back()->withErrors([
+                'feedback' => 'You can only review your own completed requests for this office.',
+            ])->withInput();
         }
 
-        Feedback::create(array_merge($data, ['citizen_id' => Auth::id()]));
+        if ($serviceRequest->status !== 'completed') {
+            return back()->withErrors([
+                'feedback' => 'Feedback becomes available once the request is completed.',
+            ])->withInput();
+        }
+
+        $alreadyExists = Feedback::where('citizen_id', Auth::id())
+            ->where('service_request_id', $serviceRequest->id)
+            ->exists();
+
+        if ($alreadyExists) {
+            return back()->withErrors([
+                'feedback' => 'You have already submitted feedback for this request.'
+            ])->withInput();
+        }
+
+        try {
+            Feedback::create([
+                'citizen_id' => Auth::id(),
+                'office_id' => $serviceRequest->office_id,
+                'service_request_id' => $serviceRequest->id,
+                'rating' => $data['rating'],
+                'comment' => $data['comment'] ?? null,
+            ]);
+        } catch (QueryException $exception) {
+            if (in_array($exception->getCode(), ['23000', '23505'], true)) {
+                return back()->withErrors([
+                    'feedback' => 'You have already submitted feedback for this request.',
+                ])->withInput();
+            }
+
+            throw $exception;
+        }
 
         return back()->with('success', 'Thank you for your feedback!');
     }

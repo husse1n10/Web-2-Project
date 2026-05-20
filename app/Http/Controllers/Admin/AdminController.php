@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Events\SupportTicketMessageSent;
-use App\Models\{Municipality, Office, ServiceRequest, SupportTicket, SupportTicketMessage, User};
+use App\Models\{Municipality, Office, Service, ServiceRequest, SupportTicket, SupportTicketMessage, User};
 use App\Notifications\SupportTicketReplyNotification;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Builder;
@@ -71,13 +72,9 @@ class AdminController extends Controller
             ->where('status', 'pending')
             ->count();
 
-        $totalRevenue = (clone $currentRequestsQuery)
-            ->where('payment_status', 'paid')
-            ->sum('amount_paid');
-
-        $previousTotalRevenue = (clone $previousRequestsQuery)
-            ->where('payment_status', 'paid')
-            ->sum('amount_paid');
+        $currentRevenueTotals = $this->sumRevenueByCurrency($currentRequestsQuery);
+        $previousRevenueTotals = $this->sumRevenueByCurrency($previousRequestsQuery);
+        $revenueTrend = $this->buildRevenueTrend($currentRevenueTotals, $previousRevenueTotals);
 
         // Platform totals with scope hints
         $currentUsersQuery = User::query()->where('role', 'citizen');
@@ -121,14 +118,15 @@ class AdminController extends Controller
             'total_offices' => $totalOffices,
             'total_requests' => $totalRequests,
             'pending_requests' => $pendingRequests,
-            'total_revenue' => $totalRevenue,
+            'total_revenue_breakdown' => Service::formatCurrencyBreakdown($currentRevenueTotals),
+            'total_revenue_currency_count' => $currentRevenueTotals->count(),
         ];
 
         $trends = [
             'total_users' => $this->buildTrend($totalUsers, $previousTotalUsers),
             'total_offices' => $this->buildTrend($totalOffices, $previousTotalOffices),
             'total_requests' => $this->buildTrend($totalRequests, $previousTotalRequests),
-            'total_revenue' => $this->buildTrend($totalRevenue, $previousTotalRevenue),
+            'total_revenue' => $revenueTrend,
         ];
 
         // Recent requests (filter-aware)
@@ -151,6 +149,11 @@ class AdminController extends Controller
         }
 
         $officeStats = $officeStatsQuery
+            ->whereHas('requests', function (Builder $query) use ($currentStart, $currentEnd): void {
+                if ($currentStart && $currentEnd) {
+                    $query->whereBetween('created_at', [$currentStart, $currentEnd]);
+                }
+            })
             ->withCount([
                 'requests as requests_count' => function (Builder $query) use ($currentStart, $currentEnd): void {
                     if ($currentStart && $currentEnd) {
@@ -158,23 +161,20 @@ class AdminController extends Controller
                     }
                 },
             ])
-            ->having('requests_count', '>', 0)
             ->orderByDesc('requests_count')
             ->limit(5)
             ->get();
 
         // Monthly chart data (year grid + current filter scope)
         $monthlyRawQuery = ServiceRequest::query()
-            ->selectRaw('EXTRACT(MONTH FROM created_at) as month_num, COUNT(*) as total')
             ->whereYear('created_at', now()->year);
 
         $this->applyRequestDashboardScope($monthlyRawQuery, $currentStart, $currentEnd, $municipalityId, $officeId);
 
         $monthlyRaw = $monthlyRawQuery
-            ->groupBy('month_num')
-            ->orderBy('month_num')
-            ->pluck('total', 'month_num')
-            ->mapWithKeys(fn ($total, $month) => [(int) $month => (int) $total]);
+            ->get(['created_at'])
+            ->groupBy(fn (ServiceRequest $request) => (int) $request->created_at->month)
+            ->map(fn ($requests) => $requests->count());
 
         $chartLabels = [];
         $chartValues = [];
@@ -250,11 +250,11 @@ class AdminController extends Controller
         ?int $officeId
     ): void {
         if ($start && $end) {
-            $query->whereBetween('created_at', [$start, $end]);
+            $query->whereBetween('service_requests.created_at', [$start, $end]);
         }
 
         if ($officeId) {
-            $query->where('office_id', $officeId);
+            $query->where('service_requests.office_id', $officeId);
             return;
         }
 
@@ -263,6 +263,41 @@ class AdminController extends Controller
                 $officeQuery->where('municipality_id', $municipalityId);
             });
         }
+    }
+
+    private function sumRevenueByCurrency(Builder $query): Collection
+    {
+        return (clone $query)
+            ->where('service_requests.payment_status', 'paid')
+            ->selectRaw("UPPER(COALESCE(service_requests.service_currency, 'USD')) as currency")
+            ->selectRaw('SUM(COALESCE(service_requests.amount_paid, service_requests.service_price, 0)) as total')
+            ->groupBy('currency')
+            ->orderBy('currency')
+            ->pluck('total', 'currency')
+            ->map(fn ($total) => (float) $total);
+    }
+
+    private function buildRevenueTrend(Collection $currentTotals, Collection $previousTotals): array
+    {
+        $currencies = $currentTotals->keys()
+            ->merge($previousTotals->keys())
+            ->unique()
+            ->values();
+
+        if ($currencies->count() > 1) {
+            return ['text' => 'N/A', 'direction' => 'flat'];
+        }
+
+        $currency = $currencies->first();
+
+        if ($currency === null) {
+            return ['text' => '0%', 'direction' => 'flat'];
+        }
+
+        return $this->buildTrend(
+            $currentTotals->get($currency, 0),
+            $previousTotals->get($currency, 0)
+        );
     }
 
     private function buildTrend(float|int $current, float|int $previous): array
@@ -546,7 +581,6 @@ class AdminController extends Controller
             'generatedAt' => now(),
             'generatedBy' => auth()->user(),
             'totalRequests' => $totalRequests,
-            'totalRevenue' => $data['revenueByOffice']->sum('revenue') ?? 0,
             'completionRate' => $totalRequests > 0 ? round(($completed / $totalRequests) * 100) : 0,
             'pendingNow' => $data['requestsByStatus']->get('pending', 0),
         ];
@@ -563,10 +597,13 @@ class AdminController extends Controller
             ->withCount('requests')
             ->orderBy('requests_count', 'desc')->get();
 
-        $revenueByOffice = Office::withSum(
-            ['requests as revenue' => fn ($q) => $q->where('payment_status', 'paid')],
-            'amount_paid'
-        )->get();
+        $revenueByOfficeTotals = $this->buildRevenueByOfficeTotals();
+        $formattedRevenueByOffice = $requestsByOffice
+            ->mapWithKeys(fn (Office $office) => [
+                $office->id => Service::formatCurrencyBreakdown($revenueByOfficeTotals->get($office->id, collect())),
+            ])
+            ->all();
+        $revenueTotalsByCurrency = $this->sumOfficeRevenueTotals($revenueByOfficeTotals);
 
         $requestsByStatus = ServiceRequest::selectRaw('status, count(*) as total')
             ->groupBy('status')->pluck('total', 'status');
@@ -579,66 +616,113 @@ class AdminController extends Controller
             ->groupBy(fn (ServiceRequest $request) => (int) $request->created_at->month)
             ->map(fn ($requests) => $requests->count());
 
-        return compact('requestsByOffice', 'revenueByOffice', 'requestsByStatus', 'monthlyRequests');
+        return compact(
+            'requestsByOffice',
+            'formattedRevenueByOffice',
+            'revenueTotalsByCurrency',
+            'requestsByStatus',
+            'monthlyRequests'
+        ) + [
+            'formattedTotalRevenue' => Service::formatCurrencyBreakdown($revenueTotalsByCurrency),
+            'revenueCurrencyCount' => $revenueTotalsByCurrency->count(),
+        ];
+    }
+
+    private function buildRevenueByOfficeTotals(): Collection
+    {
+        return ServiceRequest::query()
+            ->where('service_requests.payment_status', 'paid')
+            ->selectRaw('service_requests.office_id as office_id')
+            ->selectRaw("UPPER(COALESCE(service_requests.service_currency, 'USD')) as currency")
+            ->selectRaw('SUM(COALESCE(service_requests.amount_paid, service_requests.service_price, 0)) as total')
+            ->groupBy('service_requests.office_id', 'currency')
+            ->orderBy('service_requests.office_id')
+            ->orderBy('currency')
+            ->get()
+            ->groupBy('office_id')
+            ->map(fn (Collection $rows) => $rows
+                ->pluck('total', 'currency')
+                ->map(fn ($total) => (float) $total));
+    }
+
+    private function sumOfficeRevenueTotals(Collection $revenueByOfficeTotals): Collection
+    {
+        return $revenueByOfficeTotals->reduce(function (Collection $carry, Collection $officeTotals) {
+            foreach ($officeTotals as $currency => $total) {
+                $carry->put($currency, (float) ($carry->get($currency, 0) + $total));
+            }
+
+            return $carry;
+        }, collect());
+    }
+
+    private function formatAmountForExport(float|int|string|null $amount, ?string $currency): string
+    {
+        if ($amount === null) {
+            return '';
+        }
+
+        return Service::formatCurrencyAmount($amount, $currency, false);
     }
 
     // ── CSV Exports ───────────────────────────────────────────────
     public function exportReport(string $type)
     {
+        $formattedRevenueByOffice = $this->buildRevenueByOfficeTotals()
+            ->map(fn (Collection $totals) => Service::formatCurrencyBreakdown($totals));
+
         return match ($type) {
             'requests' => $this->streamCsv(
                 'requests-' . now()->format('Y-m-d') . '.csv',
-                ['Reference', 'Citizen', 'Service', 'Office', 'Municipality', 'Status', 'Payment Status', 'Amount Paid', 'Submitted At', 'Completed At'],
-                ServiceRequest::with(['citizen:id,name', 'service:id,name', 'office:id,name,municipality_id', 'office.municipality:id,name'])
+                ['Reference', 'Citizen', 'Service', 'Office', 'Municipality', 'Status', 'Payment Status', 'Currency', 'Quoted Amount', 'Submitted At', 'Completed At'],
+                ServiceRequest::with(['citizen:id,name', 'service:id,name,currency', 'office:id,name,municipality_id', 'office.municipality:id,name'])
                     ->orderByDesc('created_at')
                     ->lazy()
                     ->map(fn ($r) => [
                         $r->reference_number,
                         optional($r->citizen)->name ?? '-',
-                        optional($r->service)->name ?? '-',
+                        $r->resolved_service_name,
                         optional($r->office)->name ?? '-',
                         optional(optional($r->office)->municipality)->name ?? '-',
                         $r->status,
                         $r->payment_status,
-                        number_format((float) $r->amount_paid, 2, '.', ''),
+                        $r->resolved_service_currency,
+                        $this->formatAmountForExport($r->resolved_service_price, $r->resolved_service_currency),
                         optional($r->created_at)->toDateTimeString() ?? '',
                         optional($r->completed_at)->toDateTimeString() ?? '',
                     ]),
             ),
             'payments' => $this->streamCsv(
                 'payments-' . now()->format('Y-m-d') . '.csv',
-                ['Reference', 'Citizen', 'Service', 'Office', 'Method', 'Transaction ID', 'Amount', 'Paid At'],
-                ServiceRequest::with(['citizen:id,name', 'service:id,name', 'office:id,name'])
+                ['Reference', 'Citizen', 'Service', 'Office', 'Method', 'Transaction ID', 'Currency', 'Amount', 'Paid At'],
+                ServiceRequest::with(['citizen:id,name', 'service:id,name,currency', 'office:id,name'])
                     ->where('payment_status', 'paid')
                     ->orderByDesc('updated_at')
                     ->lazy()
                     ->map(fn ($r) => [
                         $r->reference_number,
                         optional($r->citizen)->name ?? '-',
-                        optional($r->service)->name ?? '-',
+                        $r->resolved_service_name,
                         optional($r->office)->name ?? '-',
                         $r->payment_method ?? '-',
                         $r->transaction_id ?? '-',
-                        number_format((float) $r->amount_paid, 2, '.', ''),
+                        $r->resolved_service_currency,
+                        $this->formatAmountForExport($r->recorded_amount, $r->resolved_service_currency),
                         optional($r->updated_at)->toDateTimeString() ?? '',
                     ]),
             ),
             'offices' => $this->streamCsv(
                 'offices-' . now()->format('Y-m-d') . '.csv',
-                ['Office', 'Municipality', 'Requests', 'Revenue (USD)'],
+                ['Office', 'Municipality', 'Requests', 'Revenue by Currency'],
                 Office::withCount('requests')
-                    ->withSum(
-                        ['requests as revenue' => fn ($q) => $q->where('payment_status', 'paid')],
-                        'amount_paid'
-                    )
                     ->with('municipality:id,name')
                     ->orderByDesc('requests_count')
-                    ->lazy()
+                    ->get()
                     ->map(fn ($o) => [
                         $o->name,
                         optional($o->municipality)->name ?? '-',
                         $o->requests_count,
-                        number_format((float) ($o->revenue ?? 0), 2, '.', ''),
+                        $formattedRevenueByOffice->get($o->id, '0'),
                     ]),
             ),
             default => abort(404),

@@ -27,7 +27,7 @@
                 @foreach($requestsNeedingAppointments as $requestItem)
                     <div class="citizen-appt-request-row">
                         <div class="citizen-appt-request-main">
-                            <div class="citizen-appt-request-service">{{ $requestItem->service->name }}</div>
+                            <div class="citizen-appt-request-service">{{ $requestItem->resolved_service_name }}</div>
                             <div class="citizen-appt-request-meta">
                                 {{ $requestItem->office->name }} &middot; {{ $requestItem->reference_number }}
                             </div>
@@ -44,7 +44,7 @@
                                 data-book-appointment
                                 data-office-id="{{ $requestItem->office_id }}"
                                 data-request-id="{{ $requestItem->id }}"
-                                data-request-label="{{ $requestItem->service->name }} - {{ $requestItem->reference_number }}"
+                                data-request-label="{{ $requestItem->resolved_service_name }} - {{ $requestItem->reference_number }}"
                             >
                                 <i class="bi {{ $citizenActionLocked ? 'bi-lock' : 'bi-calendar-plus' }} me-1"></i> {{ $citizenActionLocked ? __('Profile Verification Required') : __('Book') }}
                             </button>
@@ -75,7 +75,7 @@
                         <tr>
                             <td class="fw-semibold">{{ $appt->office->name }}</td>
                             <td class="text-muted" style="font-size:.84rem;">
-                                {{ $appt->request?->service?->name ?? '—' }}
+                                {{ $appt->request?->resolved_service_name ?? '—' }}
                             </td>
                             <td>
                                 <i class="bi bi-calendar-event me-1 text-muted"></i>
@@ -136,7 +136,7 @@
                 </div>
                 <div class="citizen-appt-mobile-main">
                     <div class="citizen-appt-mobile-title">{{ $appt->office->name }}</div>
-                    <div class="citizen-appt-mobile-sub">{{ $appt->request?->service?->name ?? 'General Visit' }}</div>
+                    <div class="citizen-appt-mobile-sub">{{ $appt->request?->resolved_service_name ?? 'General Visit' }}</div>
                     <div class="citizen-appt-mobile-time">
                         <i class="bi bi-calendar-event me-1"></i>{{ \Carbon\Carbon::parse($appt->appointment_date)->format('M d, Y') }}
                         <span class="mx-1">&middot;</span>
