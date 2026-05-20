@@ -147,6 +147,7 @@ Route::middleware(['auth', 'role:office_user'])->prefix('office')->name('office.
 
     Route::get('/requests',[OfficeController::class, 'requests'])->name('requests');
     Route::get('/requests/{serviceRequest}',          [OfficeController::class, 'showRequest'])->name('requests.show');
+    Route::get('/requests/{serviceRequest}/documents/{docId}', [OfficeController::class, 'viewDocument'])->name('documents.view');
     Route::patch('/requests/{serviceRequest}/status', [OfficeController::class, 'updateRequestStatus'])->name('requests.status');
     Route::patch('/requests/{serviceRequest}/assign', [OfficeController::class, 'assignRequest'])->name('requests.assign');
 

@@ -123,7 +123,7 @@
                             <div class="office-doc-sub">Uploaded by {{ ucfirst($doc->uploaded_by) }}</div>
                         </div>
                         <a
-                            href="{{ Storage::url($doc->file_path) }}"
+                            href="{{ route('office.documents.view', [$serviceRequest, $doc->id]) }}"
                             target="_blank"
                             class="btn btn-sm btn-outline-secondary"
                             aria-label="View document {{ $doc->original_name }}"

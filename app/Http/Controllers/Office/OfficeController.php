@@ -9,6 +9,7 @@ use App\Notifications\AppointmentReminder;
 use App\Notifications\RequestStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
 
@@ -169,7 +170,10 @@ class OfficeController extends Controller
         $requests = $query->latest()->paginate(20);
         $requests->appends($request->query());
 
-        $officeStaff = $office->users()->where('role', 'office_user')->orderBy('name')->get(['users.id', 'users.name']);
+        $officeStaff = $office->users()
+            ->where('users.role', 'office_user')
+            ->orderBy('users.name')
+            ->get(['users.id', 'users.name']);
         $overdueCount = $office->requests()
             ->whereNotIn('status', ['completed', 'rejected'])
             ->whereNotNull('due_at')
@@ -200,11 +204,26 @@ class OfficeController extends Controller
         $serviceRequest->load(['citizen', 'service', 'documents', 'statusLogs.changedBy', 'messages.sender', 'appointment', 'assignee:id,name']);
 
         $officeStaff = $this->currentOffice()->users()
-            ->where('role', 'office_user')
-            ->orderBy('name')
+            ->where('users.role', 'office_user')
+            ->orderBy('users.name')
             ->get(['users.id', 'users.name']);
 
         return view('office.requests.show', compact('serviceRequest', 'officeStaff'));
+    }
+
+    public function viewDocument(ServiceRequest $serviceRequest, string $docId)
+    {
+        $this->authorizeOfficeOwnership($serviceRequest->office_id);
+
+        $doc = $serviceRequest->documents()->findOrFail($docId);
+        abort_unless(Storage::disk('private')->exists($doc->file_path), 404, 'Document file not found.');
+
+        return Storage::disk('private')->response(
+            $doc->file_path,
+            $doc->original_name,
+            ['Cache-Control' => 'private, no-store'],
+            'inline'
+        );
     }
 
     public function assignRequest(Request $request, ServiceRequest $serviceRequest)
