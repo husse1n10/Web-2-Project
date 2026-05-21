@@ -30,10 +30,12 @@
     </div>
 
     @if($errors->has('payment'))
-        <div class="alert alert-danger mb-3">
+        <div class="alert alert-danger mb-3" id="payServerError">
             <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ $errors->first('payment') }}
         </div>
     @endif
+
+    <div class="alert alert-danger mb-3 d-none" id="payClientError" role="alert"></div>
 
     @if($citizenActionLocked)
         <div class="alert alert-warning mb-3">
@@ -305,6 +307,10 @@ const cardFields = document.getElementById('cardFields');
 const cryptoFields = document.getElementById('cryptoFields');
 const payForm = document.getElementById('payForm');
 const payBtn = document.getElementById('payBtn');
+const payClientError = document.getElementById('payClientError');
+const payServerError = document.getElementById('payServerError');
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+const initialButtonHtml = payBtn?.innerHTML ?? '';
 
 const togglePaymentFields = (value) => {
     if (!cardFields || !cryptoFields) return;
@@ -312,14 +318,76 @@ const togglePaymentFields = (value) => {
     cryptoFields.hidden = value !== 'crypto';
 };
 
+const showPaymentError = (message) => {
+    if (!payClientError) return;
+    payClientError.textContent = message;
+    payClientError.classList.remove('d-none');
+    payClientError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+const clearPaymentError = () => {
+    payClientError?.classList.add('d-none');
+    if (payClientError) {
+        payClientError.textContent = '';
+    }
+    payServerError?.classList.add('d-none');
+};
+
+const setSubmitBusy = (busy) => {
+    if (!payBtn) return;
+
+    payBtn.disabled = busy;
+
+    if (busy) {
+        payBtn.setAttribute('aria-busy', 'true');
+        payBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Processing...';
+        return;
+    }
+
+    payBtn.removeAttribute('aria-busy');
+    payBtn.innerHTML = initialButtonHtml;
+};
+
 paymentRadios.forEach((radio) => {
     radio.addEventListener('change', () => togglePaymentFields(radio.value));
 });
 
-payForm?.addEventListener('submit', () => {
-    payBtn.disabled = true;
-    payBtn.setAttribute('aria-busy', 'true');
-    payBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Processing...';
+payForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    clearPaymentError();
+    setSubmitBusy(true);
+
+    try {
+        const response = await fetch(payForm.action, {
+            method: 'POST',
+            body: new FormData(payForm),
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (response.ok && payload.redirect_url) {
+            window.location.assign(payload.redirect_url);
+            return;
+        }
+
+        const validationErrors = payload.errors ? Object.values(payload.errors).flat() : [];
+        const message = validationErrors[0]
+            || payload.message
+            || 'Could not start the payment. Please try again.';
+
+        showPaymentError(message);
+    } catch (error) {
+        showPaymentError('Could not start the payment. Please check your connection and try again.');
+    } finally {
+        setSubmitBusy(false);
+    }
 });
 </script>
 @endpush

@@ -395,6 +395,13 @@ class CitizenController extends Controller
         $result = app(PaymentService::class)->process($serviceRequest, $data['payment_method'], $request->all());
 
         if (!$result['success']) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => $result['message'],
+                ], 422);
+            }
+
             return back()->withErrors(['payment' => $result['message']]);
         }
 
@@ -404,6 +411,13 @@ class CitizenController extends Controller
                 'payment_method' => 'card',
                 'transaction_id' => $result['session_id'],
             ]);
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => true,
+                    'redirect_url' => $result['redirect_url'],
+                ]);
+            }
+
             return redirect()->away($result['redirect_url']);
         }
 
@@ -412,6 +426,13 @@ class CitizenController extends Controller
             'payment_method' => 'crypto',
             'transaction_id' => $result['invoice_id'],
         ]);
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'redirect_url' => $result['invoice_url'],
+            ]);
+        }
+
         return redirect()->away($result['invoice_url']);
     }
 

@@ -7,6 +7,7 @@ use App\Models\Office;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\User;
+use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -89,5 +90,35 @@ class CitizenPaymentValidationTest extends TestCase
         $response->assertDontSeeText('Tether (USDT TRC20)');
         $response->assertDontSeeText('Tether (USDT BSC)');
         $response->assertDontSeeText('Ethereum (ETH)');
+    }
+
+    public function test_payment_process_can_return_json_redirect_for_fetch_submission(): void
+    {
+        ['citizen' => $citizen, 'serviceRequest' => $serviceRequest] = $this->createPendingRequest();
+
+        $this->mock(PaymentService::class, function ($mock) {
+            $mock->shouldReceive('process')
+                ->once()
+                ->andReturn([
+                    'success' => true,
+                    'redirect_url' => 'https://checkout.stripe.com/c/pay/test-session',
+                    'session_id' => 'cs_test_123',
+                ]);
+        });
+
+        $response = $this->actingAs($citizen)
+            ->postJson(route('citizen.payment.process', $serviceRequest), [
+                'payment_method' => 'card',
+            ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'redirect_url' => 'https://checkout.stripe.com/c/pay/test-session',
+            ]);
+
+        $serviceRequest->refresh();
+        $this->assertSame('card', $serviceRequest->payment_method);
+        $this->assertSame('cs_test_123', $serviceRequest->transaction_id);
     }
 }
