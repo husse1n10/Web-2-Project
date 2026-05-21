@@ -866,9 +866,14 @@ class CitizenController extends Controller
     {
         abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
         $doc = $serviceRequest->documents()->findOrFail($docId);
-        return response()->download(
-            storage_path('app/private/' . $doc->file_path),
-            $doc->original_name
+        $disk = Storage::disk('private');
+
+        abort_unless($disk->exists($doc->file_path), 404, 'Document file not found.');
+
+        return $disk->download(
+            $doc->file_path,
+            $doc->original_name,
+            ['Cache-Control' => 'private, no-store']
         );
     }
 
