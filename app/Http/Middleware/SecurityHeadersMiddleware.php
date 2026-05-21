@@ -39,10 +39,12 @@ class SecurityHeadersMiddleware
 
     private function buildCsp(): string
     {
-        $appUrl   = rtrim(config('app.url'), '/');
-        $payment  = "https://checkout.stripe.com https://nowpayments.io https://*.nowpayments.io";
+        // Form-action must allow same-origin AND every host in any payment redirect chain.
+        // NOWPayments' hosted invoice page redirects through several subdomains/regions that
+        // are hard to enumerate, so we allow any HTTPS host in production rather than maintain
+        // a brittle allowlist. Local dev stays fully permissive for easier debugging.
         $formAction = app()->isProduction()
-            ? "'self' {$appUrl} {$payment}"
+            ? "'self' https:"
             : "* 'unsafe-inline'";
 
         return "default-src 'self' data: blob: https: http: 'unsafe-inline' 'unsafe-eval'; "
