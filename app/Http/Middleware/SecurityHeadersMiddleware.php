@@ -39,18 +39,58 @@ class SecurityHeadersMiddleware
 
     private function buildCsp(): string
     {
-        // Form-action must allow same-origin AND every host in any payment redirect chain.
-        // NOWPayments' hosted invoice page redirects through several subdomains/regions that
-        // are hard to enumerate, so we allow any HTTPS host in production rather than maintain
-        // a brittle allowlist. Local dev stays fully permissive for easier debugging.
+        // Chrome applies form-action to redirect chains after a POST as well, so same-origin
+        // form submissions that immediately redirect to Stripe/NOWPayments need those hosts
+        // explicitly allowlisted here. Relying on a broad scheme source like `https:` has
+        // proven brittle in production.
         $formAction = app()->isProduction()
-            ? "'self' https:"
-            : "* 'unsafe-inline'";
+            ? implode(' ', $this->productionFormActionSources())
+            : '*';
 
         return "default-src 'self' data: blob: https: http: 'unsafe-inline' 'unsafe-eval'; "
              . "connect-src 'self' https: http: ws: wss:; "
              . "frame-ancestors 'self'; "
              . "base-uri 'self'; "
              . "form-action {$formAction}";
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function productionFormActionSources(): array
+    {
+        $sources = [
+            "'self'",
+            $this->originFromUrl((string) config('app.url')),
+            'https://checkout.stripe.com',
+            'https://*.stripe.com',
+            'https://nowpayments.io',
+            'https://*.nowpayments.io',
+        ];
+
+        return array_values(array_unique(array_filter($sources)));
+    }
+
+    private function originFromUrl(string $url): ?string
+    {
+        if ($url === '') {
+            return null;
+        }
+
+        $parts = parse_url($url);
+        $scheme = $parts['scheme'] ?? null;
+        $host = $parts['host'] ?? null;
+
+        if (!$scheme || !$host) {
+            return null;
+        }
+
+        $origin = "{$scheme}://{$host}";
+
+        if (isset($parts['port'])) {
+            $origin .= ':' . $parts['port'];
+        }
+
+        return $origin;
     }
 }
