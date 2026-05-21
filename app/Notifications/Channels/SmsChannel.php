@@ -36,6 +36,18 @@ class SmsChannel
 
         $driver = (string) config('services.sms.driver', 'log');
         if ($driver !== 'twilio') {
+            if (!$this->allowsNonTwilioDriver()) {
+                Log::warning('SMS driver is not Twilio in a non-local environment.', [
+                    'notification' => get_class($notification),
+                    'driver' => $driver,
+                    'to' => $to,
+                ]);
+
+                throw new SmsDeliveryException(
+                    'WhatsApp sending is not configured on this server. Check SMS_DRIVER and Twilio settings.'
+                );
+            }
+
             Log::info('SMS (log driver)', [
                 'to' => $to,
                 'message' => $message,
@@ -103,5 +115,10 @@ class SmsChannel
             'to' => $to,
             'sid' => $response->json('sid'),
         ]);
+    }
+
+    private function allowsNonTwilioDriver(): bool
+    {
+        return in_array((string) config('app.env'), ['local', 'testing'], true);
     }
 }

@@ -134,6 +134,27 @@ class CitizenPhoneVerificationTest extends TestCase
         $this->assertNull(Cache::get('phone_otp_' . $citizen->id));
     }
 
+    public function test_non_twilio_driver_in_production_returns_json_error_and_does_not_cache_otp(): void
+    {
+        config()->set('app.env', 'production');
+        config()->set('services.sms.driver', 'log');
+
+        $citizen = $this->makeCitizen();
+
+        $response = $this->actingAs($citizen)
+            ->postJson(route('citizen.profile.phone.send'), [
+                'phone' => '+96171123456',
+            ]);
+
+        $response->assertStatus(502)
+            ->assertJson([
+                'sent' => false,
+                'message' => 'WhatsApp sending is not configured on this server. Check SMS_DRIVER and Twilio settings.',
+            ]);
+
+        $this->assertNull(Cache::get('phone_otp_' . $citizen->id));
+    }
+
     public function test_valid_phone_otp_returns_json_success_and_verifies_phone(): void
     {
         $citizen = $this->makeCitizen();
