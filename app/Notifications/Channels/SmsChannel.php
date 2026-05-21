@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Channels;
 
+use App\Exceptions\SmsDeliveryException;
 use App\Support\PhoneNumber;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
@@ -53,7 +54,7 @@ class SmsChannel
                 'notification' => get_class($notification),
                 'to' => $to,
             ]);
-            return;
+            throw new SmsDeliveryException('WhatsApp sending is not configured. Check the Twilio settings.');
         }
 
         if ($channel === 'whatsapp') {
@@ -79,17 +80,22 @@ class SmsChannel
                 'to' => $to,
                 'error' => $e->getMessage(),
             ]);
-            return;
+            throw new SmsDeliveryException('Could not reach WhatsApp provider. Please try again later.', 0, $e);
         }
 
         if (!$response->successful()) {
+            $twilioCode = (string) ($response->json('code') ?? '');
+            $message = $twilioCode === '63038'
+                ? 'Twilio WhatsApp sandbox daily message limit reached. Try again tomorrow or use SMS/log mode locally.'
+                : 'WhatsApp provider rejected the message. Check sandbox opt-in and phone number, then try again.';
+
             Log::error('Twilio SMS rejected request.', [
                 'notification' => get_class($notification),
                 'to' => $to,
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
-            return;
+            throw new SmsDeliveryException($message);
         }
 
         Log::info('Twilio SMS sent successfully.', [
