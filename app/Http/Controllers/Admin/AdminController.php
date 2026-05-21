@@ -513,13 +513,11 @@ class AdminController extends Controller
         $extension = pathinfo($user->id_document, PATHINFO_EXTENSION);
         $filename = 'citizen-' . $user->id . '-national-id' . ($extension ? ".{$extension}" : '');
 
-        $path = $disk->path($user->id_document);
         $mime = $disk->mimeType($user->id_document) ?: 'application/octet-stream';
 
-        return response()->file($path, [
+        return $disk->response($user->id_document, $filename, [
             'Content-Type' => $mime,
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
-        ]);
+        ], 'inline');
     }
 
     public function approveCitizenIdentity(User $user)
