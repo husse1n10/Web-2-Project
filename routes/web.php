@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Office\OfficeController;
 use App\Http\Controllers\Citizen\CitizenController;
+use App\Http\Controllers\SupportAttachmentController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -85,6 +86,8 @@ Route::middleware('auth')->group(function () {
         auth()->user()->unreadNotifications->markAsRead();
         return response()->json(['success' => true]);
     })->name('notifications.readAll');
+    Route::get('/support/{ticket}/attachments/{message}', [SupportAttachmentController::class, 'download'])
+        ->name('support.attachments.download');
     Route::get('/security/2fa', [AuthController::class, 'show2FASettings'])->name('security.2fa');
     Route::post('/security/2fa/enable', [AuthController::class, 'enable2FA'])->name('security.2fa.enable');
     Route::post('/security/2fa/disable', [AuthController::class, 'disable2FA'])->name('security.2fa.disable');

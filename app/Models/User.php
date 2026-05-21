@@ -172,6 +172,6 @@ class User extends Authenticatable implements MustVerifyEmail
             return $this->avatar;
         }
 
-        return Storage::url($this->avatar);
+        return Storage::disk('public')->url($this->avatar);
     }
 }

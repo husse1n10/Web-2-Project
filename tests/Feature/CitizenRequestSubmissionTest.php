@@ -87,6 +87,7 @@ class CitizenRequestSubmissionTest extends TestCase
         $this->assertSame('USD', $serviceRequest->service_currency);
         $this->assertCount(2, $serviceRequest->documents);
         $this->assertNotNull($serviceRequest->qr_code);
+        Storage::disk('public')->assertExists($serviceRequest->qr_code);
 
         // Reference number format: SRQ-YYYY-XXXXXXXX (8-char random suffix, non-enumerable)
         $this->assertMatchesRegularExpression(

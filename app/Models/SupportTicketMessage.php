@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class SupportTicketMessage extends Model
 {
@@ -31,6 +30,11 @@ class SupportTicketMessage extends Model
 
     public function getAttachmentUrlAttribute(): ?string
     {
-        return $this->attachment ? Storage::url($this->attachment) : null;
+        return $this->attachment
+            ? route('support.attachments.download', [
+                'ticket' => $this->support_ticket_id,
+                'message' => $this->id,
+            ])
+            : null;
     }
 }

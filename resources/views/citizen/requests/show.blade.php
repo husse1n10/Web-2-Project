@@ -181,7 +181,7 @@
             <div class="card text-center citizen-reveal" data-citizen-reveal>
                 <div class="card-body">
                     <div class="citizen-side-card-title">{{ __('Track via QR Code') }}</div>
-                    <img src="{{ Storage::url($serviceRequest->qr_code) }}" alt="QR Code" class="citizen-qr-image">
+                    <img src="{{ Storage::disk('public')->url($serviceRequest->qr_code) }}" alt="QR Code" class="citizen-qr-image">
                     <div class="citizen-muted-note mt-2">{{ __('Scan to check request status.') }}</div>
                 </div>
             </div>
