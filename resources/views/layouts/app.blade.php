@@ -1843,8 +1843,6 @@
             ->count()
         : 0;
     $unreadCount = $user->unreadNotifications()->count();
-    $citizenActionLocked = $user->isCitizen() && !$user->canUseCitizenSelfServiceActions();
-    $citizenActionMessage = $citizenActionLocked ? $user->citizenActionRestrictionMessage() : null;
 @endphp
 
 {{-- Sidebar overlay (mobile) --}}
@@ -2189,21 +2187,6 @@
                         @csrf
                         <button type="submit" class="btn btn-sm btn-outline-warning">Resend</button>
                     </form>
-                </div>
-            @endif
-
-            @if($citizenActionLocked && !request()->routeIs('citizen.profile*') && $citizenActionMessage)
-                <div class="alert {{ $user->isCitizenIdentityRejected() ? 'alert-danger' : 'alert-warning' }} d-flex align-items-start gap-2 mb-3" style="font-size:.85rem;">
-                    <i class="bi {{ $user->isCitizenIdentityRejected() ? 'bi-shield-x' : 'bi-shield-exclamation' }} mt-1"></i>
-                    <div class="flex-fill">
-                        <div class="fw-semibold mb-1">{{ __('Some actions are temporarily locked') }}</div>
-                        <div>{{ $citizenActionMessage }}</div>
-                        <div class="mt-2">
-                            <a href="{{ route('citizen.profile') }}" class="btn btn-sm {{ $user->isCitizenIdentityRejected() ? 'btn-outline-danger' : 'btn-outline-warning' }}">
-                                <i class="bi bi-person-lines-fill me-1"></i>{{ __('Open Profile') }}
-                            </a>
-                        </div>
-                    </div>
                 </div>
             @endif
 

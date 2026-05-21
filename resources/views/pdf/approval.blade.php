@@ -88,7 +88,7 @@
 
     <p class="body-text">
         Please ensure that all required fees are settled and any outstanding documents are submitted promptly.
-        You will be notified via email and through the E-Services platform once your documents are ready for collection or delivery.
+        You will be notified via email and through the CedarGov platform once your documents are ready for collection or delivery.
     </p>
 
     <div class="conditions">
@@ -120,7 +120,7 @@
     </div>
 
     <div class="footer-bar">
-        <span>E-Services Government Platform &copy; {{ date('Y') }}</span>
+        <span>CedarGov Platform &copy; {{ date('Y') }}</span>
         <span>Generated: {{ now()->format('M d, Y H:i') }} | Ref: {{ $serviceRequest->reference_number }}</span>
     </div>
 

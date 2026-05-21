@@ -63,7 +63,7 @@
                         <span class="pm-option" data-method="crypto">
                             <i class="bi bi-currency-bitcoin"></i>
                             <span class="pm-option-title">Crypto</span>
-                            <span class="pm-option-sub">BTC / ETH / USDT</span>
+                            <span class="pm-option-sub">BTC / USDT ERC20</span>
                         </span>
                     </label>
                 </div>
@@ -80,8 +80,7 @@
                         <label class="form-label">Select Cryptocurrency</label>
                         <select name="crypto_currency" class="form-select" @disabled($citizenActionLocked)>
                             <option value="BTC">Bitcoin (BTC)</option>
-                            <option value="ETH">Ethereum (ETH)</option>
-                            <option value="USDT">Tether USDT</option>
+                            <option value="USDTERC20" selected>Tether (USDT ERC20)</option>
                         </select>
                     </div>
                     <div class="citizen-payment-info is-crypto">

@@ -1,4 +1,4 @@
-# CedarGov — E-Services Management Platform
+# CedarGov — Municipal Services Platform
 
 A Laravel 12 web platform for **municipal e-services in Lebanon**.
 Citizens submit service requests, pay online (card or crypto), book appointments, chat with offices, and track progress with QR codes. Office users manage requests, services, appointments, and feedback. Admins oversee municipalities, offices, users, and identity verification.

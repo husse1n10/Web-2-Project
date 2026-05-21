@@ -14,6 +14,11 @@ use Stripe\HttpClient\CurlClient;
 
 class PaymentService
 {
+    private const SUPPORTED_CRYPTO_CURRENCIES = [
+        'btc' => 'btc',
+        'usdterc20' => 'usdterc20',
+    ];
+
     public function __construct()
     {
         Stripe::setApiKey(config('services.stripe.secret'));
@@ -124,14 +129,27 @@ class PaymentService
     {
         $apiKey  = config('services.nowpayments.api_key');
         $baseUrl = rtrim((string) config('services.nowpayments.base_url'), '/');
-        $servicePrice = $req->resolved_service_price;
+        $servicePrice = (float) $req->resolved_service_price;
         $serviceCurrency = strtolower($req->resolved_service_currency);
+        $payCurrency = $this->normalizeCryptoCurrency($payload['crypto_currency'] ?? 'btc');
 
         if (empty($apiKey)) {
             return [
                 'success' => false,
                 'message' => 'Crypto payments are not configured. Please use card payment.',
             ];
+        }
+
+        if ($payCurrency === null) {
+            return [
+                'success' => false,
+                'message' => 'Unsupported cryptocurrency selected. Please choose BTC or USDT ERC20.',
+            ];
+        }
+
+        $minCheck = $this->checkCryptoMinimum($baseUrl, $apiKey, $payCurrency, $serviceCurrency, $servicePrice);
+        if (!$minCheck['ok']) {
+            return ['success' => false, 'message' => $minCheck['message']];
         }
 
         try {
@@ -141,9 +159,9 @@ class PaymentService
                 ])
                 ->timeout(20)
                 ->post("{$baseUrl}/invoice", [
-                    'price_amount'      => (float) $servicePrice,
+                    'price_amount'      => $servicePrice,
                     'price_currency'    => $serviceCurrency,
-                    'pay_currency'      => strtolower($payload['crypto_currency'] ?? 'btc'),
+                    'pay_currency'      => $payCurrency,
                     'order_id'          => (string) $req->id,
                     'order_description' => 'Service Request: ' . $req->reference_number,
                     'ipn_callback_url'  => route('webhooks.nowpayments'),
@@ -176,6 +194,45 @@ class PaymentService
             Log::error('NOWPayments invoice request threw: ' . $e->getMessage());
             return ['success' => false, 'message' => 'Could not connect to crypto payment processor. Please try again.'];
         }
+    }
+
+    private function checkCryptoMinimum(string $baseUrl, string $apiKey, string $payCurrency, string $fiatCurrency, float $amount): array
+    {
+        try {
+            $response = Http::withHeaders(['x-api-key' => $apiKey])
+                ->timeout(10)
+                ->get("{$baseUrl}/min-amount", [
+                    'currency_from'   => $payCurrency,
+                    'fiat_equivalent' => $fiatCurrency,
+                ]);
+
+            if (!$response->successful()) {
+                return ['ok' => true];
+            }
+
+            $minFiat = $response->json('fiat_equivalent');
+            if ($minFiat === null || $amount >= (float) $minFiat) {
+                return ['ok' => true];
+            }
+
+            $coin = strtoupper($payCurrency);
+            $minFmt = number_format((float) $minFiat, 2);
+            $fiat = strtoupper($fiatCurrency);
+            return [
+                'ok'      => false,
+                'message' => "The amount is too small for {$coin}. Minimum is approximately {$minFmt} {$fiat}. Please choose a USDT network or another cryptocurrency with lower fees.",
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('NOWPayments min-amount check failed: ' . $e->getMessage());
+            return ['ok' => true];
+        }
+    }
+
+    private function normalizeCryptoCurrency(string $currency): ?string
+    {
+        $normalized = strtolower(trim($currency));
+
+        return self::SUPPORTED_CRYPTO_CURRENCIES[$normalized] ?? null;
     }
 
     // ── Currency Conversion ────────────────────────────────────────

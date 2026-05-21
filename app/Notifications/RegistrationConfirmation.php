@@ -31,7 +31,7 @@ class RegistrationConfirmation extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'message' => 'Your account was created successfully. Welcome to E-Services Platform.',
+            'message' => 'Your account was created successfully. Welcome to CedarGov Platform.',
             'type' => 'registration_confirmation',
         ];
     }

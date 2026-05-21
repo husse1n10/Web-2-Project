@@ -136,7 +136,7 @@
     </div>
 
     <div class="cert-footer">
-        <span>E-Services Government Platform &copy; {{ date('Y') }} — This is an official document.</span>
+        <span>CedarGov Platform &copy; {{ date('Y') }} — This is an official document.</span>
         <span>Generated: {{ now()->format('M d, Y H:i') }} | Ref: {{ $serviceRequest->reference_number }}</span>
     </div>
 

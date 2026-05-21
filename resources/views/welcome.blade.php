@@ -1283,7 +1283,7 @@
         <div data-reveal="left">
             <div class="lp-eyebrow">
                 <span class="lp-eyebrow-dot"></span>
-                Municipal E-Services &mdash; Lebanon
+                CedarGov &mdash; Lebanon
             </div>
 
             <h1 class="lp-headline" id="heroHeadline">

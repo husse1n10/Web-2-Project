@@ -77,8 +77,7 @@ class AuthController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
-        return $this->redirectByRole($user)
-                    ->with('success', 'Welcome to E-Services! Check your inbox to verify your email.');
+        return $this->redirectByRole($user);
     }
 
     public function extractNationalIdDocument(Request $request): JsonResponse
@@ -296,7 +295,7 @@ class AuthController extends Controller
             session(['2fa_setup_secret' => $secret]);
         }
 
-        $issuer = config('app.name', 'E-Services');
+        $issuer = config('app.name', 'CedarGov');
         $label = rawurlencode($issuer . ':' . $user->email);
         $issuerEncoded = rawurlencode($issuer);
         $otpAuthUrl = "otpauth://totp/{$label}?secret={$secret}&issuer={$issuerEncoded}&algorithm=SHA1&digits=6&period=30";
@@ -923,11 +922,6 @@ class AuthController extends Controller
 
     private function redirectByRole(User $user): \Illuminate\Http\RedirectResponse
     {
-        if ($user->role === 'citizen' && ($message = $user->citizenActionRestrictionMessage())) {
-            return redirect()->route('citizen.dashboard')
-                ->with($user->hasCompletedCitizenProfile() ? 'warning' : 'info', $message);
-        }
-
         return match ($user->role) {
             'admin'       => redirect()->route('admin.dashboard'),
             'office_user' => redirect()->route('office.dashboard'),

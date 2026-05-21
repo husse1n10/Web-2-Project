@@ -27,7 +27,9 @@ class SecurityHeadersMiddleware
         $response->header('X-XSS-Protection',           '1; mode=block');
         $response->header('Referrer-Policy',             'strict-origin-when-cross-origin');
         $response->header('Permissions-Policy',          'camera=(), microphone=(), geolocation=()');
-        $response->header('Strict-Transport-Security',   'max-age=31536000; includeSubDomains');
+        if (app()->isProduction() && $request->isSecure()) {
+            $response->header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
         $response->header('Cache-Control',               'no-store, no-cache, must-revalidate, max-age=0');
         $response->header('Pragma',                      'no-cache');
         $response->header('Expires',                     '0');
@@ -38,9 +40,10 @@ class SecurityHeadersMiddleware
     private function buildCsp(): string
     {
         $appUrl   = rtrim(config('app.url'), '/');
+        $payment  = "https://checkout.stripe.com https://nowpayments.io https://*.nowpayments.io";
         $formAction = app()->isProduction()
-            ? "'self' {$appUrl} https://checkout.stripe.com"
-            : "'self' {$appUrl} http://127.0.0.1:* http://localhost:* https://checkout.stripe.com";
+            ? "'self' {$appUrl} {$payment}"
+            : "* 'unsafe-inline'";
 
         return "default-src 'self' data: blob: https: http: 'unsafe-inline' 'unsafe-eval'; "
              . "connect-src 'self' https: http: ws: wss:; "

@@ -209,7 +209,7 @@
                                     <div class="citizen-input-wrap flex-grow-1">
                                         <i class="bi bi-phone citizen-input-icon"></i>
                                         <input type="tel" id="fb-phone-input" class="form-control"
-                                               value="{{ $user->phone }}" placeholder="+96170551180">
+                                               value="{{ $user->phone }}" placeholder="+96170551180" maxlength="25" autocomplete="tel">
                                     </div>
                                 <button type="button" id="fb-send-btn" class="btn btn-outline-primary btn-sm text-nowrap">
                                         <i class="bi bi-whatsapp me-1"></i>{{ __('Send via WhatsApp') }}
@@ -1171,11 +1171,18 @@ zone?.addEventListener('drop', (event) => {
 
 @push('scripts')
 {{-- Phone verification via Twilio SMS OTP --}}
+@php
+    $smsDefaultCountryCode = (string) config('services.sms.default_country_code', '+961');
+    $smsDefaultCountryCode = str_starts_with($smsDefaultCountryCode, '+')
+        ? $smsDefaultCountryCode
+        : '+' . $smsDefaultCountryCode;
+@endphp
 <script>
 (function () {
     const SEND_URL   = '{{ route("citizen.profile.phone.send") }}';
     const VERIFY_URL = '{{ route("citizen.profile.phone.verify") }}';
     const CSRF       = '{{ csrf_token() }}';
+    const DEFAULT_COUNTRY_CODE = @json($smsDefaultCountryCode);
 
     const step1   = document.getElementById('fb-step-1');
     const step2   = document.getElementById('fb-step-2');
@@ -1193,11 +1200,34 @@ zone?.addEventListener('drop', (event) => {
     const showErr = (el, msg) => { el.textContent = msg; el.style.display = 'block'; };
     const hideErr = (el) => { el.style.display = 'none'; };
     const setBtn  = (btn, html, disabled) => { btn.disabled = disabled; btn.innerHTML = html; };
+    const normalizePhone = (raw) => {
+        const value = String(raw ?? '').trim();
+        if (!value || !/^[\d\s()+-]+$/.test(value)) return null;
+        if ((value.match(/\+/g) ?? []).length > 1) return null;
+        if (value.slice(1).includes('+')) return null;
+
+        let clean = value.replace(/[^\d+]/g, '');
+        if (!clean) return null;
+
+        if (clean.startsWith('00')) {
+            clean = `+${clean.slice(2)}`;
+        }
+
+        if (!clean.startsWith('+')) {
+            if (clean.startsWith('0')) clean = clean.slice(1);
+            clean = `${DEFAULT_COUNTRY_CODE}${clean}`;
+        }
+
+        return /^\+\d{8,15}$/.test(clean) ? clean : null;
+    };
 
     sendBtn.addEventListener('click', async () => {
         hideErr(sendErr);
-        const phone = (phoneIn?.value ?? '').trim().replace(/\s+/g, '');
-        if (!phone) { showErr(sendErr, 'Please enter your phone number.'); return; }
+        const rawPhone = (phoneIn?.value ?? '').trim();
+        if (!rawPhone) { showErr(sendErr, 'Please enter your phone number.'); return; }
+
+        const phone = normalizePhone(rawPhone);
+        if (!phone) { showErr(sendErr, 'Enter a valid phone number, for example +96171123456.'); return; }
 
         setBtn(sendBtn, '<span class="spinner-border spinner-border-sm me-1"></span>Sending...', true);
 
@@ -1211,20 +1241,21 @@ zone?.addEventListener('drop', (event) => {
                 },
                 body: JSON.stringify({ phone }),
             });
+            const data = await resp.json().catch(() => null);
 
-            if (!resp.ok) {
-                const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data?.sent) {
                 const msg = data?.errors?.phone?.[0] || data?.message || 'Could not send code. Check the number format and try again.';
                 throw new Error(msg);
             }
 
             step1.classList.add('d-none');
             step2.classList.remove('d-none');
+            if (phoneIn) phoneIn.value = data.phone || phone;
             otpIn?.focus();
-            window.showToast?.('Verification code sent via WhatsApp.', 'success');
+            window.showToast?.(data.message || 'Verification code sent via WhatsApp.', 'success');
         } catch (err) {
             setBtn(sendBtn, '<i class="bi bi-send me-1"></i>Send Code', false);
-            showErr(sendErr, err.message || 'Failed to send. Use format: +96171150300');
+            showErr(sendErr, err.message || 'Enter a valid phone number, for example +96171123456.');
         }
     });
 
@@ -1245,9 +1276,9 @@ zone?.addEventListener('drop', (event) => {
                 },
                 body: JSON.stringify({ otp: code }),
             });
+            const data = await resp.json().catch(() => null);
 
-            if (!resp.ok) {
-                const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data?.verified) {
                 const msg = data?.errors?.otp?.[0] || 'Invalid or expired code. Please try again.';
                 throw new Error(msg);
             }

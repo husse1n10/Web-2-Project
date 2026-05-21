@@ -503,7 +503,6 @@ body.es-role-office_user .office-pdf-hint {
     const chatBox = document.getElementById('chatBox');
     const chatInput = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
-    const myInitial = @json(strtoupper(substr(auth()->user()->name, 0, 1)));
 
     async function sendMsg() {
         const body = chatInput?.value?.trim();

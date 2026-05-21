@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
 use App\Events\SupportTicketMessageSent;
+use App\Support\PhoneNumber;
 
 class CitizenController extends Controller
 {
@@ -130,8 +131,24 @@ class CitizenController extends Controller
 
     public function sendPhoneOtp(Request $request)
     {
-        $data = $request->validate(['phone' => 'required|string|max:20']);
-        $phone = $data['phone'];
+        $data = $request->validate(['phone' => 'required|string|max:25']);
+        $phone = PhoneNumber::normalize($data['phone']);
+
+        if (!$phone) {
+            $message = 'Enter a valid phone number, for example +96171123456.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'sent' => false,
+                    'message' => $message,
+                    'errors' => [
+                        'phone' => [$message],
+                    ],
+                ], 422);
+            }
+
+            return back()->withErrors(['phone' => $message]);
+        }
 
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
@@ -143,6 +160,14 @@ class CitizenController extends Controller
         Notification::route('sms', $phone)
             ->notify(new PhoneVerificationNotification($otp));
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'sent' => true,
+                'message' => 'Verification code sent via WhatsApp.',
+                'phone' => $phone,
+            ]);
+        }
+
         return back()->with('otp_sent', true);
     }
 
@@ -152,6 +177,16 @@ class CitizenController extends Controller
         $cached = Cache::get('phone_otp_' . Auth::id());
 
         if (!$cached || $cached['otp'] !== $data['otp']) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'verified' => false,
+                    'message' => 'Invalid or expired code. Please try again.',
+                    'errors' => [
+                        'otp' => ['Invalid or expired code. Please try again.'],
+                    ],
+                ], 422);
+            }
+
             return back()->withErrors(['otp' => 'Invalid or expired code. Please try again.'])->with('otp_sent', true);
         }
 
@@ -161,6 +196,14 @@ class CitizenController extends Controller
         $user->save();
 
         Cache::forget('phone_otp_' . Auth::id());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'verified' => true,
+                'message' => 'Phone number verified successfully!',
+                'phone' => $user->phone,
+            ]);
+        }
 
         return back()->with('success', 'Phone number verified successfully!');
     }
@@ -344,7 +387,10 @@ class CitizenController extends Controller
     {
         abort_unless($serviceRequest->citizen_id === Auth::id(), 403);
 
-        $data = $request->validate(['payment_method' => 'required|in:card,crypto']);
+        $data = $request->validate([
+            'payment_method' => 'required|in:card,crypto',
+            'crypto_currency' => 'nullable|required_if:payment_method,crypto|string|in:BTC,USDTERC20',
+        ]);
 
         $result = app(PaymentService::class)->process($serviceRequest, $data['payment_method'], $request->all());
 
