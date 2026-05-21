@@ -9,6 +9,9 @@ use App\Notifications\AppointmentReminder;
 use App\Notifications\RequestStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use App\Events\MessageSent;
+use App\Events\MessagesRead;
 
 class OfficeController extends Controller
 {
@@ -21,13 +24,23 @@ class OfficeController extends Controller
     public function dashboard()
     {
         $office = $this->currentOffice();
+        $revenueTotals = $office->requests()
+            ->where('service_requests.payment_status', 'paid')
+            ->selectRaw("UPPER(COALESCE(service_requests.service_currency, 'USD')) as currency")
+            ->selectRaw('SUM(COALESCE(service_requests.amount_paid, service_requests.service_price, 0)) as total')
+            ->groupBy('currency')
+            ->orderBy('currency')
+            ->pluck('total', 'currency')
+            ->map(fn ($total) => (float) $total);
 
         $stats = [
             'pending'              => $office->requests()->where('status', 'pending')->count(),
             'in_review'            => $office->requests()->where('status', 'in_review')->count(),
             'completed_this_month' => $office->requests()->where('status', 'completed')
-                                            ->whereMonth('updated_at', now()->month)->count(),
-            'revenue'              => $office->requests()->where('payment_status', 'paid')->sum('amount_paid'),
+                                            ->whereYear('completed_at', now()->year)
+                                            ->whereMonth('completed_at', now()->month)
+                                            ->count(),
+            'revenue_breakdown'    => Service::formatCurrencyBreakdown($revenueTotals),
             'avg_rating'           => $office->feedbacks()->avg('rating') ?? 0,
             'pending_today'        => $office->requests()->whereDate('created_at', today())->count(),
         ];
@@ -94,7 +107,7 @@ class OfficeController extends Controller
         $data   = $request->validate([
             'name'                    => 'required|string|max:255',
             'description'             => 'nullable|string',
-            'price'                   => 'required|numeric|min:0',
+            'price'                   => 'required|numeric|min:0|decimal:0,2',
             'currency'                => 'required|string|max:5',
             'estimated_duration_days' => 'required|integer|min:1',
             'required_documents'      => 'nullable|array',
@@ -110,7 +123,8 @@ class OfficeController extends Controller
         $this->authorizeOfficeOwnership($service->office_id);
         $data = $request->validate([
             'name'                    => 'required|string|max:255',
-            'price'                   => 'required|numeric',
+            'price'                   => 'required|numeric|decimal:0,2',
+            'currency'                => 'required|string|max:5',
             'estimated_duration_days' => 'required|integer|min:1',
             'is_active'               => 'boolean',
         ]);
@@ -129,23 +143,123 @@ class OfficeController extends Controller
     public function requests(Request $request)
     {
         $office = $this->currentOffice();
-        $query  = $office->requests()->with(['citizen', 'service']);
+
+        $query = $office->requests()
+            ->with(['citizen', 'service', 'assignee:id,name'])
+            ->withCount([
+                'messages as unread_messages_count' => function ($q) {
+                    $q->whereNull('read_at')
+                        ->where('sender_id', '!=', Auth::id());
+                }
+            ]);
+
+        if ($request->boolean('overdue')) {
+            $query->whereNotIn('status', ['completed', 'rejected'])
+                  ->whereNotNull('due_at')
+                  ->where('due_at', '<', now());
+        }
+
+        if ($request->filled('assigned_to')) {
+            if ($request->assigned_to === 'unassigned') {
+                $query->whereNull('assigned_to');
+            } elseif ($request->assigned_to === 'me') {
+                $query->where('assigned_to', Auth::id());
+            } else {
+                $query->where('assigned_to', $request->assigned_to);
+            }
+        }
 
         if ($request->status) $query->where('status', $request->status);
         if ($request->search) {
-            $query->where('reference_number', 'like', "%{$request->search}%")
-                ->orWhereHas('citizen', fn ($q) => $q->where('name', 'like', "%{$request->search}%"));
+            $search = trim((string) $request->search);
+            $query->where(function ($builder) use ($search) {
+                $builder->where('reference_number', 'like', "%{$search}%")
+                    ->orWhereHas('citizen', fn ($citizenQuery) => $citizenQuery->where('name', 'like', "%{$search}%"));
+            });
         }
 
         $requests = $query->latest()->paginate(20);
-        return view('office.requests.index', compact('requests'));
+        $requests->appends($request->query());
+
+        $officeStaff = $office->users()
+            ->where('users.role', 'office_user')
+            ->orderBy('users.name')
+            ->get(['users.id', 'users.name']);
+        $overdueCount = $office->requests()
+            ->whereNotIn('status', ['completed', 'rejected'])
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+
+        return view('office.requests.index', compact('requests', 'officeStaff', 'overdueCount'));
     }
 
     public function showRequest(ServiceRequest $serviceRequest)
     {
         $this->authorizeOfficeOwnership($serviceRequest->office_id);
-        $serviceRequest->load(['citizen', 'service', 'documents', 'statusLogs.changedBy', 'messages.sender' , 'appointment']);
-        return view('office.requests.show', compact('serviceRequest'));
+
+        $readMessageIds = $serviceRequest->messages()
+            ->whereNull('read_at')
+            ->where('sender_id', '!=', Auth::id())
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($readMessageIds)) {
+            $serviceRequest->messages()
+                ->whereIn('id', $readMessageIds)
+                ->update(['read_at' => now()]);
+
+            event(new MessagesRead($serviceRequest->id, $readMessageIds, Auth::id()));
+        }
+
+        $serviceRequest->load(['citizen', 'service', 'documents', 'statusLogs.changedBy', 'messages.sender', 'appointment', 'assignee:id,name']);
+
+        $officeStaff = $this->currentOffice()->users()
+            ->where('users.role', 'office_user')
+            ->orderBy('users.name')
+            ->get(['users.id', 'users.name']);
+
+        return view('office.requests.show', compact('serviceRequest', 'officeStaff'));
+    }
+
+    public function viewDocument(ServiceRequest $serviceRequest, string $docId)
+    {
+        $this->authorizeOfficeOwnership($serviceRequest->office_id);
+
+        $doc = $serviceRequest->documents()->findOrFail($docId);
+        abort_unless(Storage::disk('private')->exists($doc->file_path), 404, 'Document file not found.');
+
+        return Storage::disk('private')->response(
+            $doc->file_path,
+            $doc->original_name,
+            ['Cache-Control' => 'private, no-store'],
+            'inline'
+        );
+    }
+
+    public function assignRequest(Request $request, ServiceRequest $serviceRequest)
+    {
+        $this->authorizeOfficeOwnership($serviceRequest->office_id);
+
+        $data = $request->validate([
+            'assigned_to' => 'nullable|integer|exists:users,id',
+            'due_at'      => 'nullable|date|after_or_equal:today',
+        ]);
+
+        // Assignee must be a user attached to this office (any role on the pivot).
+        if (!empty($data['assigned_to'])) {
+            $belongs = $this->currentOffice()->users()->where('users.id', $data['assigned_to'])->exists();
+            if (!$belongs) {
+                return back()->withErrors(['assigned_to' => 'That user is not a member of this office.']);
+            }
+        }
+
+        $serviceRequest->update([
+            'assigned_to' => $data['assigned_to'] ?? null,
+            'due_at'      => $data['due_at'] ?? $serviceRequest->due_at,
+        ]);
+
+        return back()->with('success', 'Request assignment updated.');
     }
 
     public function updateRequestStatus(Request $request, ServiceRequest $serviceRequest)
@@ -183,7 +297,9 @@ class OfficeController extends Controller
     {
         $office   = $this->currentOffice();
         $feedback = $office->feedbacks()->with('citizen')->latest()->paginate(15);
-        return view('office.feedback.index', compact('feedback'));
+        $averageRating = (float) ($office->feedbacks()->avg('rating') ?? 0);
+
+        return view('office.feedback.index', compact('feedback', 'averageRating'));
     }
 
     public function replyFeedback(Request $request, Feedback $feedback)
@@ -234,6 +350,8 @@ class OfficeController extends Controller
             'body'      => $data['body'],
         ]);
 
+        event(new MessageSent($msg));
+
         return response()->json(['message' => $msg->load('sender'), 'success' => true]);
     }
 
@@ -242,6 +360,13 @@ class OfficeController extends Controller
     {
         $this->authorizeOfficeOwnership($serviceRequest->office_id);
         $svc = app(\App\Services\PdfService::class);
+
+        abort_unless(match ($type) {
+            'receipt' => $serviceRequest->canDownloadReceipt(),
+            'approval' => $serviceRequest->canDownloadApprovalLetter(),
+            'certificate' => $serviceRequest->canDownloadCertificate(),
+            default => false,
+        }, 403);
 
         $path = match ($type) {
             'receipt'     => $svc->generateReceipt($serviceRequest),
@@ -259,4 +384,38 @@ class OfficeController extends Controller
         $office = $this->currentOffice();
         abort_unless($office->id === $officeId, 403);
     }
+
+    public function getMessages(ServiceRequest $serviceRequest)
+    {
+        $this->authorizeOfficeOwnership($serviceRequest->office_id);
+
+        return response()->json([
+            'messages' => $serviceRequest->messages()->with('sender')->get()
+        ]);
+    }
+
+    public function markMessagesRead(ServiceRequest $serviceRequest)
+    {
+        $this->authorizeOfficeOwnership($serviceRequest->office_id);
+
+        $readMessageIds = $serviceRequest->messages()
+            ->whereNull('read_at')
+            ->where('sender_id', '!=', Auth::id())
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($readMessageIds)) {
+            $serviceRequest->messages()
+                ->whereIn('id', $readMessageIds)
+                ->update(['read_at' => now()]);
+
+            event(new MessagesRead($serviceRequest->id, $readMessageIds, Auth::id()));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message_ids' => $readMessageIds,
+        ]);
+    }
+
 }

@@ -28,12 +28,12 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
         ]);
 
         return (new MailMessage)
-            ->subject('Reset Your E-Services Password')
-            ->greeting("Hello {$notifiable->name},")
-            ->line('We received a request to reset your password.')
-            ->action('Reset Password', $url)
-            ->line('If you did not request a password reset, no further action is required.')
-            ->line('This reset link will expire according to your application settings.');
+            ->subject('CedarGov — Password Reset Request')
+            ->greeting("Hello, {$notifiable->name}")
+            ->line('We received a request to reset the password for your CedarGov account.')
+            ->line('Click the button below to choose a new password:')
+            ->action('Reset My Password', $url)
+            ->line('This link will expire in 60 minutes. If you did not request this, you can safely ignore this email — your password will remain unchanged.')
+            ->salutation('— The CedarGov Team');
     }
 }
-

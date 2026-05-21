@@ -3,18 +3,25 @@
 namespace App\Models;
 
 use App\Notifications\ResetPasswordNotification;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'phone', 'national_id',
+        'name', 'email', 'password', 'role', 'phone', 'phone_verified_at', 'national_id',
         'id_document',          // column in migration
+        'citizen_verification_status',
+        'citizen_verification_notes',
+        'citizen_verified_at',
+        'citizen_verified_by',
         'is_active',
         'two_factor_secret',    // column in migration
         'two_factor_enabled',   // column in migration
@@ -25,6 +32,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at'  => 'datetime',
+        'citizen_verified_at' => 'datetime',
         'is_active'          => 'boolean',
         'two_factor_enabled' => 'boolean',
     ];
@@ -33,6 +41,12 @@ class User extends Authenticatable
     public function isAdmin(): bool      { return $this->role === 'admin'; }
     public function isOfficeUser(): bool { return $this->role === 'office_user'; }
     public function isCitizen(): bool    { return $this->role === 'citizen'; }
+
+    public function canUseCitizenSelfServiceActions(): bool
+    {
+        return !$this->isCitizen()
+            || ($this->hasCompletedCitizenProfile() && $this->hasVerifiedCitizenIdentity());
+    }
 
     public function hasCompletedCitizenProfile(): bool
     {
@@ -64,6 +78,48 @@ class User extends Authenticatable
         return $missing;
     }
 
+    public function hasVerifiedCitizenIdentity(): bool
+    {
+        return !$this->isCitizen() || $this->citizen_verification_status === 'approved';
+    }
+
+    public function isCitizenIdentityPending(): bool
+    {
+        return $this->isCitizen() && $this->citizen_verification_status === 'pending';
+    }
+
+    public function isCitizenIdentityApproved(): bool
+    {
+        return $this->isCitizen() && $this->citizen_verification_status === 'approved';
+    }
+
+    public function isCitizenIdentityRejected(): bool
+    {
+        return $this->isCitizen() && $this->citizen_verification_status === 'rejected';
+    }
+
+    public function citizenActionRestrictionMessage(): ?string
+    {
+        if (!$this->isCitizen() || $this->canUseCitizenSelfServiceActions()) {
+            return null;
+        }
+
+        if (!$this->hasCompletedCitizenProfile()) {
+            $missingFields = $this->missingCitizenProfileFields();
+            $message = 'Complete your profile to unlock new requests, payments, and appointment booking.';
+
+            if (!empty($missingFields)) {
+                $message .= ' Missing: ' . implode(', ', $missingFields) . '.';
+            }
+
+            return $message;
+        }
+
+        return $this->isCitizenIdentityRejected()
+            ? 'Your National ID document was rejected. Upload a corrected document to unlock new requests, payments, and appointment booking again.'
+            : 'Your National ID document is pending admin validation. You can still browse the portal and manage existing items, but new requests, payments, and appointment booking stay locked until approval.';
+    }
+
     // ── Relationships ─────────────────────────────────────────────
     public function offices()
     {
@@ -86,6 +142,16 @@ class User extends Authenticatable
         return $this->hasMany(Feedback::class, 'citizen_id');
     }
 
+    public function supportTickets()
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
+
+    public function citizenVerifier()
+    {
+        return $this->belongsTo(User::class, 'citizen_verified_by');
+    }
+
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPasswordNotification($token));
@@ -94,5 +160,18 @@ class User extends Authenticatable
     public function routeNotificationForSms(): ?string
     {
         return $this->phone;
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (blank($this->avatar)) {
+            return null;
+        }
+
+        if (Str::startsWith($this->avatar, ['http://', 'https://'])) {
+            return $this->avatar;
+        }
+
+        return Storage::url($this->avatar);
     }
 }

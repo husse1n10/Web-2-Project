@@ -1,0 +1,49 @@
+{
+    "name": "CedarGov Platform",
+    "description": "Laravel municipal e-services platform for Lebanon",
+    "keywords": ["laravel", "php", "e-services"],
+    "buildpacks": [
+        { "url": "heroku/nodejs" },
+        { "url": "heroku/php" }
+    ],
+    "addons": [
+        {
+            "plan": "heroku-postgresql:essential-0"
+        }
+    ],
+    "env": {
+        "APP_NAME": {
+            "value": "CedarGov Platform"
+        },
+        "APP_ENV": {
+            "value": "production"
+        },
+        "APP_DEBUG": {
+            "value": "false"
+        },
+        "APP_KEY": {
+            "generator": "secret"
+        },
+        "APP_URL": {
+            "description": "Your Heroku app URL (e.g. https://your-app.herokuapp.com)"
+        },
+        "DB_CONNECTION": {
+            "value": "pgsql"
+        },
+        "LOG_CHANNEL": {
+            "value": "errorlog"
+        },
+        "SESSION_DRIVER": {
+            "value": "database"
+        },
+        "CACHE_STORE": {
+            "value": "database"
+        },
+        "QUEUE_CONNECTION": {
+            "value": "database"
+        }
+    },
+    "scripts": {
+        "postdeploy": "php artisan migrate --force && php artisan db:seed --force"
+    }
+}

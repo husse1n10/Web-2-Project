@@ -1,199 +1,651 @@
 @extends('layouts.app')
-@section('title','Admin Dashboard')
-@section('page-title','Dashboard')
-
-@section('content')
-
-{{-- ── Hero Banner ─────────────────────────────────────── --}}
-<div class="hero-banner" style="margin-bottom:1.4rem">
-    <div class="hero-banner-content" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
-        <div>
-            <div style="color:rgba(255,255,255,.38);font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.25rem">
-                {{ now()->format('l, F j, Y') }}
-            </div>
-            <h1 style="font-family:var(--font-disp);font-style:italic;font-size:1.5rem;font-weight:700;color:#fff;margin:0;letter-spacing:-.03em">
-                Good {{ now()->hour < 12 ? 'morning' : (now()->hour < 18 ? 'afternoon' : 'evening') }}, {{ explode(' ', auth()->user()->name)[0] }}
-            </h1>
-            <p style="color:rgba(255,255,255,.4);font-size:.79rem;margin:.25rem 0 0;line-height:1.5">
-                Here's what's happening across the platform today.
-            </p>
-        </div>
-        <div style="display:flex;gap:.5rem;flex-shrink:0">
-            <a href="{{ route('admin.reports') }}" class="btn btn-sm" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.8)">
-                <i class="bi bi-bar-chart-line"></i> Reports
-            </a>
-            <a href="{{ route('admin.offices') }}" class="btn btn-sm" style="background:var(--gold);border:none;color:#fff;font-weight:700">
-                <i class="bi bi-plus-lg"></i> New Office
-            </a>
-        </div>
-    </div>
-</div>
-
-{{-- ── Stat Cards ──────────────────────────────────────── --}}
-@php
-    $pct = $stats['total_requests'] > 0 ? round(($stats['pending_requests']/$stats['total_requests'])*100) : 0;
-@endphp
-<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.85rem;margin-bottom:1.4rem" class="stats-grid">
-    <div class="stat-card" style="--stat-tint:var(--navy-50)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="stat-icon" style="background:var(--navy-50);color:var(--primary)"><i class="bi bi-people-fill"></i></div>
-            <span class="stat-delta up"><i class="bi bi-arrow-up-short"></i> Citizens</span>
-        </div>
-        <div class="stat-val">{{ number_format($stats['total_users']) }}</div>
-        <div class="stat-lbl">Registered Users</div>
-    </div>
-    <div class="stat-card" style="--stat-tint:var(--green-lt)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="stat-icon" style="background:var(--green-lt);color:var(--green)"><i class="bi bi-building-fill"></i></div>
-            <span class="stat-delta up"><i class="bi bi-arrow-up-short"></i> Active</span>
-        </div>
-        <div class="stat-val">{{ $stats['total_offices'] }}</div>
-        <div class="stat-lbl">Government Offices</div>
-    </div>
-    <div class="stat-card" style="--stat-tint:var(--amber-lt)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="stat-icon" style="background:var(--amber-lt);color:var(--amber)"><i class="bi bi-hourglass-split"></i></div>
-            <span class="stat-delta {{ $pct > 30 ? 'dn' : 'neutral' }}">{{ $pct }}% of total</span>
-        </div>
-        <div class="stat-val">{{ number_format($stats['pending_requests']) }}</div>
-        <div class="stat-lbl">Awaiting Review</div>
-    </div>
-    <div class="stat-card" style="--stat-tint:var(--gold-100)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div class="stat-icon" style="background:var(--gold-100);color:var(--gold-600)"><i class="bi bi-cash-coin"></i></div>
-            <span class="stat-delta up"><i class="bi bi-arrow-up-short"></i> Revenue</span>
-        </div>
-        <div class="stat-val">${{ number_format($stats['total_revenue'], 0) }}</div>
-        <div class="stat-lbl">Total Collected</div>
-    </div>
-</div>
-
-{{-- ── Main grid ────────────────────────────────────────── --}}
-<div style="display:grid;grid-template-columns:1fr;gap:1.1rem" class="dash-grid">
-
-    {{-- Recent requests table --}}
-    <div class="card">
-        <div class="card-hd">
-            <span class="card-hd-title">Recent Service Requests</span>
-            <a href="{{ route('admin.reports') }}" class="btn btn-sm btn-primary">
-                <i class="bi bi-graph-up"></i> Full Report
-            </a>
-        </div>
-        <div class="card-body p0">
-            <div class="table-wrap">
-                <table class="table table-hover mb-0">
-                    <thead><tr>
-                        <th>Reference</th>
-                        <th>Citizen</th>
-                        <th class="hide-mob">Service</th>
-                        <th>Status</th>
-                        <th class="hide-mob">Submitted</th>
-                    </tr></thead>
-                    <tbody>
-                    @forelse($recentRequests as $req)
-                    <tr>
-                        <td><code>{{ $req->reference_number }}</code></td>
-                        <td>
-                            <div style="display:flex;align-items:center;gap:.55rem">
-                                <div style="width:28px;height:28px;border-radius:50%;background:var(--primary-lt);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:.64rem;font-weight:700;flex-shrink:0">
-                                    {{ strtoupper(substr($req->citizen->name,0,1)) }}
-                                </div>
-                                <div>
-                                    <div style="font-weight:600;font-size:.82rem;line-height:1.2">{{ $req->citizen->name }}</div>
-                                    <div class="d-md-none" style="font-size:.69rem;color:var(--ink-400)">{{ $req->office->name }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="hide-mob" style="font-size:.8rem;color:var(--ink-500)">
-                            <div style="font-size:.8rem;font-weight:500">{{ $req->service->name }}</div>
-                            <div style="font-size:.72rem;color:var(--ink-400)">{{ $req->office->name }}</div>
-                        </td>
-                        <td><span class="sbadge s-{{ $req->status }}">{{ ucfirst(str_replace('_',' ',$req->status)) }}</span></td>
-                        <td class="hide-mob" style="font-size:.76rem;color:var(--ink-400)">{{ $req->created_at->diffForHumans() }}</td>
-                    </tr>
-                    @empty
-                    <tr><td colspan="5">
-                        <div class="empty-state" style="padding:3rem 1rem">
-                            <div class="empty-icon"><i class="bi bi-inbox"></i></div>
-                            <h4>No requests yet</h4>
-                            <p>Service requests will appear here once citizens start submitting.</p>
-                        </div>
-                    </td></tr>
-                    @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {{-- Bottom 2-col --}}
-    <div style="display:grid;grid-template-columns:1fr;gap:1.1rem" class="bot-row">
-
-        {{-- Top offices --}}
-        <div class="card">
-            <div class="card-hd">
-                <span class="card-hd-title">Top Offices by Volume</span>
-                <a href="{{ route('admin.offices') }}" class="btn btn-sm btn-ghost">Manage</a>
-            </div>
-            <div class="card-body">
-                @forelse($officeStats as $i => $office)
-                @php $colors = ['#1E4080','#0D7A4E','#B45309','#6D28D9','#0E7490']; $bgs = ['var(--primary-lt)','var(--green-lt)','var(--amber-lt)','var(--violet-lt)','var(--cyan-lt)']; @endphp
-                <div style="display:flex;align-items:center;gap:.85rem;{{ !$loop->last ? 'margin-bottom:1rem' : '' }}">
-                    <div style="width:32px;height:32px;border-radius:9px;background:{{ $bgs[$i%5] }};color:{{ $colors[$i%5] }};display:flex;align-items:center;justify-content:center;font-family:var(--font-disp);font-style:italic;font-size:.8rem;font-weight:700;flex-shrink:0">{{ $i+1 }}</div>
-                    <div style="flex:1;min-width:0">
-                        <div style="font-size:.82rem;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $office->name }}</div>
-                        <div class="prog-track">
-                            <div class="prog-bar" style="width:{{ $officeStats->first()->requests_count > 0 ? round(($office->requests_count/$officeStats->first()->requests_count)*100) : 0 }}%;background:{{ $colors[$i%5] }}"></div>
-                        </div>
-                    </div>
-                    <div style="font-size:.82rem;font-weight:700;color:var(--ink-600);min-width:24px;text-align:right;flex-shrink:0">{{ $office->requests_count }}</div>
-                </div>
-                @empty
-                <div class="empty-state" style="padding:1.5rem 0">
-                    <p>No office data available yet.</p>
-                </div>
-                @endforelse
-            </div>
-        </div>
-
-        {{-- Quick actions --}}
-        <div class="card">
-            <div class="card-hd"><span class="card-hd-title">Quick Actions</span></div>
-            <div class="card-body" style="display:flex;flex-direction:column;gap:.6rem">
-                @foreach([
-                    ['route'=>'admin.municipalities','icon'=>'bi-geo-alt-fill','bg'=>'var(--navy-50)','ic'=>'var(--primary)','title'=>'Add Municipality','sub'=>'Create a new administrative district'],
-                    ['route'=>'admin.offices','icon'=>'bi-building-add','bg'=>'var(--green-lt)','ic'=>'var(--green)','title'=>'Register Office','sub'=>'Add a government service office'],
-                    ['route'=>'admin.users','icon'=>'bi-person-add','bg'=>'var(--amber-lt)','ic'=>'var(--amber)','title'=>'Create Staff Account','sub'=>'Assign new office managers'],
-                    ['route'=>'admin.reports','icon'=>'bi-bar-chart-line','bg'=>'var(--violet-lt)','ic'=>'var(--violet)','title'=>'View Reports','sub'=>'Full analytics & statistics'],
-                ] as $action)
-                <a href="{{ route($action['route']) }}"
-                   style="display:flex;align-items:center;gap:.8rem;padding:.8rem .95rem;border-radius:var(--r-sm);border:1.5px solid var(--ink-200);text-decoration:none;color:inherit;transition:all .18s;background:var(--white)"
-                   onmouseover="this.style.borderColor='{{ $action['ic'] }}';this.style.background='{{ $action['bg'] }}'"
-                   onmouseout="this.style.borderColor='var(--ink-200)';this.style.background='var(--white)'">
-                    <div style="width:36px;height:36px;border-radius:9px;background:{{ $action['bg'] }};color:{{ $action['ic'] }};display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0">
-                        <i class="bi {{ $action['icon'] }}"></i>
-                    </div>
-                    <div style="flex:1;min-width:0">
-                        <div style="font-size:.82rem;font-weight:600;color:var(--ink-800)">{{ $action['title'] }}</div>
-                        <div style="font-size:.71rem;color:var(--ink-400)">{{ $action['sub'] }}</div>
-                    </div>
-                    <i class="bi bi-chevron-right" style="color:var(--ink-200);font-size:.78rem;flex-shrink:0"></i>
-                </a>
-                @endforeach
-            </div>
-        </div>
-    </div>
-</div>
+@section('title', 'Admin Dashboard')
+@section('page-title', 'Admin Dashboard')
 
 @push('styles')
 <style>
-@media(min-width:640px)  { .stats-grid { grid-template-columns: repeat(2,1fr) !important; } }
-@media(min-width:1024px) { .stats-grid { grid-template-columns: repeat(4,1fr) !important; } }
-@media(min-width:1100px) {
-    .dash-grid { grid-template-columns: 1fr 400px !important; }
-    .dash-grid > .card:first-child { grid-row: 1 / 3; }
-    .bot-row { grid-template-columns: 1fr !important; }
+/* ═══════════════════════════════════════════════════════
+   ADMIN DASHBOARD — PREMIUM GLASSMORPHISM STYLES
+   ═══════════════════════════════════════════════════════ */
+
+/* Filter bar — glass */
+.admin-dashboard-filters {
+    border: 1px solid rgba(79,70,229,0.08) !important;
+    border-radius: .85rem;
+    background: rgba(255,255,255,0.5) !important;
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    margin-bottom: 1rem;
+}
+.admin-dashboard-filters .card-body { padding: .9rem 1rem; }
+.admin-filter-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 1fr auto;
+    gap: .65rem;
+    align-items: end;
+}
+.admin-filter-actions { display: flex; gap: .5rem; align-items: center; }
+.admin-filter-label {
+    font-size: .72rem;
+    color: var(--es-muted);
+    font-weight: 600;
+    margin-bottom: .26rem;
+}
+.admin-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .24rem;
+    background: linear-gradient(135deg, #4F46E5, #2563EB);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: .2rem .56rem;
+    font-size: .64rem;
+    font-weight: 700;
+    margin-left: .45rem;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.22);
+}
+
+/* KPI cards — glass with unique gradient accent bars */
+.admin-kpi-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(79,70,229,0.08) !important;
+    background: rgba(255,255,255,0.5) !important;
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    transition: transform .28s cubic-bezier(.4,0,.2,1), box-shadow .28s cubic-bezier(.4,0,.2,1);
+}
+.admin-kpi-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 3px;
+    opacity: .5;
+    transition: opacity .28s ease;
+}
+.admin-kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px rgba(79,70,229,0.1);
+}
+.admin-kpi-card:hover::before { opacity: 1; }
+
+.col-6:nth-child(1) .admin-kpi-card::before { background: linear-gradient(90deg, #14B8A6, #10B981); }
+.col-6:nth-child(2) .admin-kpi-card::before { background: linear-gradient(90deg, #0EA5E9, #2563EB); }
+.col-6:nth-child(3) .admin-kpi-card::before { background: linear-gradient(90deg, #F59E0B, #EF4444); }
+.col-6:nth-child(4) .admin-kpi-card::before { background: linear-gradient(90deg, #10B981, #059669); }
+
+/* Office ranking list — glass items */
+.admin-list-item {
+    border: 1px solid rgba(79,70,229,0.06) !important;
+    background: rgba(255,255,255,0.4) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s ease, border-color .22s ease;
+}
+.admin-list-item:hover {
+    border-color: rgba(79,70,229,0.15) !important;
+    background: rgba(255,255,255,0.6) !important;
+    transform: translateX(4px);
+    box-shadow: 0 8px 20px rgba(79,70,229,0.08);
+}
+.admin-list-item-main {
+    font-weight: 700;
+    font-size: .84rem;
+    color: #1F2A3D;
+}
+.admin-list-item-sub {
+    color: var(--es-muted);
+    font-size: .72rem;
+    margin-top: .12rem;
+}
+.admin-count-badge {
+    background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+    color: #fff !important;
+    border: none !important;
+    min-width: 28px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(79,70,229,0.2);
+}
+
+/* Chart — glass wrapper */
+.admin-chart-wrap {
+    position: relative;
+    min-height: 250px;
+}
+.admin-chart-wrap canvas { height: 250px !important; }
+
+.admin-table-tight td,
+.admin-table-tight th {
+    padding-top: .62rem;
+    padding-bottom: .62rem;
+}
+.admin-card-meta {
+    font-size: .72rem;
+    color: var(--es-muted);
+    font-weight: 500;
+}
+.admin-empty-state .btn { margin-top: .75rem; }
+
+/* Live loading overlay — glass blur */
+.admin-dashboard-live {
+    position: relative;
+    transition: opacity .22s ease;
+}
+.admin-dashboard-live.is-loading {
+    opacity: .58;
+    pointer-events: none;
+}
+.admin-dashboard-live.is-loading::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 19;
+    background: rgba(255,255,255,.3);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+.admin-dashboard-live.is-loading::after {
+    content: '';
+    position: absolute;
+    top: 1rem; left: 1rem;
+    width: min(18rem, calc(100% - 2rem));
+    height: .82rem;
+    border-radius: .45rem;
+    background: linear-gradient(90deg, rgba(79,70,229,.15) 0%, rgba(79,70,229,.35) 50%, rgba(79,70,229,.15) 100%);
+    z-index: 20;
+    animation: adminBusyShimmer 1.05s ease-in-out infinite;
+}
+
+@media (max-width: 1199.98px) {
+    .admin-filter-grid { grid-template-columns: 1fr 1fr; }
+    .admin-filter-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 767.98px) {
+    .admin-filter-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .admin-kpi-card,
+    .admin-list-item { transition: none; }
 }
 </style>
 @endpush
+
+@section('content')
+<div id="adminDashboardLiveRoot" class="admin-dashboard-live admin-busy-target">
+<x-admin.page-header
+    title="Admin Overview"
+    :subtitle="'Live operational summary for ' . strtolower($dashboardFilters['period_label']) . '.'">
+    <x-slot:actions>
+        @if($dashboardFilters['is_scoped'])
+            <span class="admin-filter-badge"><i class="bi bi-funnel"></i> Filtered</span>
+        @endif
+    </x-slot:actions>
+</x-admin.page-header>
+
+<div class="card admin-dashboard-filters admin-reveal">
+    <div class="card-body">
+        <form
+            id="adminDashboardFilters"
+            method="GET"
+            action="{{ route('admin.dashboard') }}"
+            class="admin-filter-grid"
+            data-admin-busy-target="#adminDashboardLiveRoot">
+            <div>
+                <label class="admin-filter-label" for="dashboardPeriod">Date Range</label>
+                <select id="dashboardPeriod" name="period" class="form-select form-select-sm">
+                    <option value="this_month" {{ $dashboardFilters['period'] === 'this_month' ? 'selected' : '' }}>This Month</option>
+                    <option value="last_30" {{ $dashboardFilters['period'] === 'last_30' ? 'selected' : '' }}>Last 30 Days</option>
+                    <option value="last_90" {{ $dashboardFilters['period'] === 'last_90' ? 'selected' : '' }}>Last 90 Days</option>
+                    <option value="this_year" {{ $dashboardFilters['period'] === 'this_year' ? 'selected' : '' }}>This Year</option>
+                    <option value="all" {{ $dashboardFilters['period'] === 'all' ? 'selected' : '' }}>All Time</option>
+                </select>
+            </div>
+            <div>
+                <label class="admin-filter-label" for="dashboardMunicipality">Municipality</label>
+                <select id="dashboardMunicipality" name="municipality_id" class="form-select form-select-sm">
+                    <option value="">All Municipalities</option>
+                    @foreach($municipalities as $municipality)
+                        <option value="{{ $municipality->id }}" {{ (int) $dashboardFilters['municipality_id'] === $municipality->id ? 'selected' : '' }}>
+                            {{ $municipality->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="admin-filter-label" for="dashboardOffice">Office</label>
+                <select id="dashboardOffice" name="office_id" class="form-select form-select-sm">
+                    <option value="">All Offices</option>
+                    @foreach($officeOptions as $officeOption)
+                        <option value="{{ $officeOption->id }}" {{ (int) $dashboardFilters['office_id'] === $officeOption->id ? 'selected' : '' }}>
+                            {{ $officeOption->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="admin-filter-actions">
+                <button id="adminDashboardApply" type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check2"></i> Apply
+                </button>
+                @if($dashboardFilters['is_scoped'])
+                    <a id="adminDashboardClear" href="{{ route('admin.dashboard') }}" class="btn btn-sm admin-plain-btn">Clear</a>
+                @endif
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3 admin-reveal">
+        <x-admin.stat-card
+            label="Total Users"
+            :value="number_format($stats['total_users'])"
+            subtitle="Platform citizens"
+            icon="bi-people"
+            color="teal"
+            :trend="$trends['total_users']['text']"
+            :trend-direction="$trends['total_users']['direction']"
+            :animate="true"
+            :value-raw="$stats['total_users']"
+            value-decimals="0" />
+    </div>
+    <div class="col-6 col-lg-3 admin-reveal">
+        <x-admin.stat-card
+            label="Offices"
+            :value="number_format($stats['total_offices'])"
+            subtitle="Offices in scope"
+            icon="bi-buildings"
+            color="sky"
+            :trend="$trends['total_offices']['text']"
+            :trend-direction="$trends['total_offices']['direction']"
+            :animate="true"
+            :value-raw="$stats['total_offices']"
+            value-decimals="0" />
+    </div>
+    <div class="col-6 col-lg-3 admin-reveal">
+        <x-admin.stat-card
+            label="Requests"
+            :value="number_format($stats['total_requests'])"
+            :subtitle="'During ' . strtolower($dashboardFilters['period_label'])"
+            icon="bi-file-earmark-text"
+            color="amber"
+            :trend="$trends['total_requests']['text']"
+            :trend-direction="$trends['total_requests']['direction']"
+            :animate="true"
+            :value-raw="$stats['total_requests']"
+            value-decimals="0" />
+    </div>
+    <div class="col-6 col-lg-3 admin-reveal">
+        <x-admin.stat-card
+            label="Revenue"
+            :value="$stats['total_revenue_breakdown']"
+            :subtitle="$stats['total_revenue_currency_count'] > 1 ? 'Paid request totals by currency' : 'Collected from paid requests'"
+            icon="bi-currency-dollar"
+            color="emerald"
+            :trend="$trends['total_revenue']['text']"
+            :trend-direction="$trends['total_revenue']['direction']"
+            :trend-label="$stats['total_revenue_currency_count'] > 1 ? 'mixed currencies' : 'vs previous period'"
+        />
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-xl-8 admin-reveal">
+        <div class="card h-100 admin-busy-target" id="adminDashboardRequestsCard">
+            <x-admin.table-toolbar
+                title="Recent Service Requests"
+                subtitle="Latest request activity across municipalities and offices.">
+                <x-slot:actions>
+                    <span class="admin-card-meta">Pending: {{ number_format($stats['pending_requests']) }}</span>
+                    <div class="admin-density-switch ms-2">
+                        <button
+                            type="button"
+                            class="admin-density-btn is-active"
+                            data-admin-density-target="#adminDashboardRequestsTable"
+                            data-admin-density="comfortable">Comfort</button>
+                        <button
+                            type="button"
+                            class="admin-density-btn"
+                            data-admin-density-target="#adminDashboardRequestsTable"
+                            data-admin-density="compact">Compact</button>
+                    </div>
+                </x-slot:actions>
+            </x-admin.table-toolbar>
+            <div class="card-body p-0">
+                @if($recentRequests->count())
+                    <div class="admin-table-wrap">
+                        <table
+                            id="adminDashboardRequestsTable"
+                            class="table table-hover admin-table-sticky admin-table-tight admin-table-interactive mb-0"
+                            data-admin-table>
+                            <thead>
+                                <tr>
+                                    <th data-sort="0" data-sort-type="text">Reference</th>
+                                    <th data-sort="1" data-sort-type="text">Citizen</th>
+                                    <th data-sort="2" data-sort-type="text">Office</th>
+                                    <th data-sort="3" data-sort-type="text">Service</th>
+                                    <th data-sort="4" data-sort-type="text">Status</th>
+                                    <th data-sort="5" data-sort-type="date">Submitted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($recentRequests as $request)
+                                    <tr>
+                                        <td><span class="fw-semibold">{{ $request->reference_number }}</span></td>
+                                        <td>{{ $request->citizen->name }}</td>
+                                        <td>{{ $request->office->name }}</td>
+                                        <td>{{ $request->resolved_service_name }}</td>
+                                        <td><x-status-pill :status="$request->status" /></td>
+                                        <td class="admin-muted" data-sort-value="{{ $request->created_at->timestamp }}">{{ $request->created_at->diffForHumans() }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="admin-empty-state">
+                        <div class="admin-empty-state-icon"><i class="bi bi-inbox"></i></div>
+                        <div class="admin-empty-state-title">No Requests In This Range</div>
+                        <div class="admin-empty-state-copy">Try widening the date range or clearing office filters to see more activity.</div>
+                        @if($dashboardFilters['is_scoped'])
+                            <a href="{{ route('admin.dashboard') }}" class="btn btn-sm admin-plain-btn">Reset Filters</a>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-4 admin-reveal">
+        <div class="card h-100">
+            <x-admin.table-toolbar
+                title="Top Offices by Volume"
+                subtitle="Highest request counts in the selected scope." />
+            <div class="card-body">
+                @if($officeStats->count())
+                    <div class="d-flex flex-column gap-2">
+                        @foreach($officeStats as $office)
+                            <div class="d-flex justify-content-between align-items-center border rounded-3 p-3 admin-list-item">
+                                <div>
+                                    <div class="admin-list-item-main">{{ $office->name }}</div>
+                                    <div class="admin-list-item-sub">{{ $office->municipality->name ?? 'Municipality' }}</div>
+                                </div>
+                                <span class="badge rounded-pill border admin-count-badge">{{ $office->requests_count }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="admin-empty-state" style="padding-top:1.5rem;padding-bottom:1.5rem;">
+                        <div class="admin-empty-state-icon"><i class="bi bi-bar-chart"></i></div>
+                        <div class="admin-empty-state-title">No Office Ranking Yet</div>
+                        <div class="admin-empty-state-copy">Office activity appears once requests are submitted in the selected range.</div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 admin-reveal">
+        <div class="card">
+            <x-admin.table-toolbar
+                title="Monthly Requests"
+                :subtitle="now()->year . ' trend for ' . strtolower($dashboardFilters['period_label']) . '.'" />
+            <div class="card-body">
+                @if(collect($chartValues)->sum() > 0)
+                    <div class="admin-chart-wrap">
+                        <canvas
+                            id="monthlyRequestsChart"
+                            aria-label="Monthly requests chart"
+                            data-chart-labels='@json($chartLabels)'
+                            data-chart-values='@json($chartValues)'></canvas>
+                    </div>
+                @else
+                    <div class="admin-empty-state" style="padding-top:1.25rem;padding-bottom:1.25rem;">
+                        <div class="admin-empty-state-icon"><i class="bi bi-graph-up"></i></div>
+                        <div class="admin-empty-state-title">No Trend Data Yet</div>
+                        <div class="admin-empty-state-copy">No requests matched your current scope for chart visualization.</div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+</div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    (function () {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let autoSubmitTimer = null;
+
+        const formatNumber = (value, decimals) =>
+            Number(value).toLocaleString(undefined, {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+
+        const setApplyLoading = (form, loading) => {
+            if (!form) return;
+            const applyBtn = form.querySelector('#adminDashboardApply');
+            if (!applyBtn) return;
+            if (!applyBtn.dataset.originalHtml) {
+                applyBtn.dataset.originalHtml = applyBtn.innerHTML;
+            }
+            applyBtn.disabled = loading;
+            applyBtn.innerHTML = loading
+                ? '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Applying'
+                : applyBtn.dataset.originalHtml;
+        };
+
+        const animateCounters = (scope) => {
+            scope.querySelectorAll('[data-counter]').forEach((el, index) => {
+                const target = Number(el.dataset.counterTarget || 0);
+                const prefix = el.dataset.counterPrefix || '';
+                const suffix = el.dataset.counterSuffix || '';
+                const decimals = Number(el.dataset.counterDecimals || 0);
+
+                const setValue = (value) => {
+                    el.textContent = `${prefix}${formatNumber(value, decimals)}${suffix}`;
+                };
+
+                if (!Number.isFinite(target) || prefersReducedMotion) {
+                    setValue(target);
+                    return;
+                }
+
+                const duration = 850 + (index * 120);
+                const startTime = performance.now();
+
+                const tick = (now) => {
+                    const progress = Math.min((now - startTime) / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    setValue(target * eased);
+                    if (progress < 1) {
+                        window.requestAnimationFrame(tick);
+                    }
+                };
+
+                window.requestAnimationFrame(tick);
+            });
+        };
+
+        const renderMonthlyChart = (scope) => {
+            const canvas = scope.querySelector('#monthlyRequestsChart');
+            if (window.__adminMonthlyChart) {
+                window.__adminMonthlyChart.destroy();
+                window.__adminMonthlyChart = null;
+            }
+            if (!canvas || typeof Chart === 'undefined') return;
+
+            const labels = JSON.parse(canvas.dataset.chartLabels || '[]');
+            const values = JSON.parse(canvas.dataset.chartValues || '[]');
+
+            const css = getComputedStyle(document.body);
+            const primary = css.getPropertyValue('--es-primary').trim() || '#2563EB';
+            const muted = css.getPropertyValue('--es-muted').trim() || '#64748B';
+            const border = css.getPropertyValue('--es-border-soft').trim() || '#E7EDF5';
+
+            window.__adminMonthlyChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Requests',
+                        data: values,
+                        borderColor: primary,
+                        backgroundColor: `${primary}1f`,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 3,
+                        pointBackgroundColor: primary,
+                        pointHoverRadius: 5,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: muted, font: { size: 11, family: 'Public Sans' } },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: muted, font: { size: 11, family: 'Public Sans' } },
+                            grid: { color: border },
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0F172A',
+                            titleFont: { family: 'Public Sans' },
+                            bodyFont: { family: 'Public Sans' }
+                        }
+                    }
+                }
+            });
+        };
+
+        const buildFilterUrl = (form) => {
+            const url = new URL(form.action, window.location.origin);
+            const params = new URLSearchParams();
+            const formData = new FormData(form);
+            for (const [key, value] of formData.entries()) {
+                if (String(value).trim() === '') continue;
+                params.set(key, value);
+            }
+            if (!params.has('period')) {
+                params.set('period', 'this_month');
+            }
+            url.search = params.toString();
+            return url;
+        };
+
+        const swapDashboard = async (url, sourceForm) => {
+            const currentRoot = document.getElementById('adminDashboardLiveRoot');
+            if (!currentRoot) return;
+
+            currentRoot.classList.add('is-loading');
+            setApplyLoading(sourceForm, true);
+
+            try {
+                const response = await fetch(url.toString(), {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok) throw new Error(`Dashboard request failed (${response.status})`);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const nextDoc = parser.parseFromString(html, 'text/html');
+                const nextRoot = nextDoc.getElementById('adminDashboardLiveRoot');
+                if (!nextRoot) throw new Error('Live root not found in response');
+
+                currentRoot.replaceWith(nextRoot);
+                history.replaceState({}, '', url.toString());
+                initDashboardEnhancements();
+            } catch (error) {
+                window.location.href = url.toString();
+            } finally {
+                setApplyLoading(sourceForm, false);
+                currentRoot.classList.remove('is-loading');
+            }
+        };
+
+        const bindDashboardFilters = () => {
+            const form = document.getElementById('adminDashboardFilters');
+            if (!form || form.dataset.ajaxBound === '1') return;
+
+            form.dataset.ajaxBound = '1';
+            const municipalitySelect = form.querySelector('#dashboardMunicipality');
+            const officeSelect = form.querySelector('#dashboardOffice');
+            const periodSelect = form.querySelector('#dashboardPeriod');
+            const clearLink = form.querySelector('#adminDashboardClear');
+
+            const requestLiveUpdate = () => {
+                if (form.dataset.loading === '1') return;
+                const url = buildFilterUrl(form);
+                form.dataset.loading = '1';
+                swapDashboard(url, form).finally(() => {
+                    form.dataset.loading = '0';
+                });
+            };
+
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                requestLiveUpdate();
+            });
+
+            periodSelect?.addEventListener('change', () => {
+                window.clearTimeout(autoSubmitTimer);
+                autoSubmitTimer = window.setTimeout(() => form.requestSubmit(), 120);
+            });
+
+            municipalitySelect?.addEventListener('change', () => {
+                if (officeSelect) officeSelect.value = '';
+                window.clearTimeout(autoSubmitTimer);
+                autoSubmitTimer = window.setTimeout(() => form.requestSubmit(), 120);
+            });
+
+            officeSelect?.addEventListener('change', () => {
+                window.clearTimeout(autoSubmitTimer);
+                autoSubmitTimer = window.setTimeout(() => form.requestSubmit(), 120);
+            });
+
+            clearLink?.addEventListener('click', (event) => {
+                event.preventDefault();
+                form.reset();
+                const clearUrl = new URL(clearLink.href, window.location.origin);
+                form.dataset.loading = '1';
+                swapDashboard(clearUrl, form).finally(() => {
+                    form.dataset.loading = '0';
+                });
+            });
+        };
+
+        const initDashboardEnhancements = () => {
+            const root = document.getElementById('adminDashboardLiveRoot');
+            if (!root) return;
+            animateCounters(root);
+            renderMonthlyChart(root);
+            bindDashboardFilters();
+            if (typeof window.initAdminGlobalUX === 'function') {
+                window.initAdminGlobalUX(root);
+            }
+        };
+
+        initDashboardEnhancements();
+    })();
+</script>
+@endpush

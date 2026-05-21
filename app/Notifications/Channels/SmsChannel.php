@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Channels;
 
+use App\Support\PhoneNumber;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +22,7 @@ class SmsChannel
             return;
         }
 
-        $to = $this->normalizePhone((string) $rawTo);
+        $to = PhoneNumber::normalize((string) $rawTo);
 
         if (blank($to)) {
             Log::warning('SMS notification skipped due to invalid phone number.', [
@@ -45,6 +46,7 @@ class SmsChannel
         $sid = (string) config('services.twilio.sid');
         $token = (string) config('services.twilio.token');
         $from = (string) config('services.twilio.from');
+        $channel = (string) config('services.twilio.channel', 'sms');
 
         if (blank($sid) || blank($token) || blank($from)) {
             Log::warning('SMS driver is Twilio but keys are missing.', [
@@ -52,6 +54,11 @@ class SmsChannel
                 'to' => $to,
             ]);
             return;
+        }
+
+        if ($channel === 'whatsapp') {
+            $to = 'whatsapp:' . $to;
+            $from = str_starts_with($from, 'whatsapp:') ? $from : 'whatsapp:' . $from;
         }
 
         $url = "https://api.twilio.com/2010-04-01/Accounts/{$sid}/Messages.json";
@@ -90,30 +97,5 @@ class SmsChannel
             'to' => $to,
             'sid' => $response->json('sid'),
         ]);
-    }
-
-    private function normalizePhone(string $phone): ?string
-    {
-        $clean = preg_replace('/[^\d+]/', '', trim($phone));
-        if (!is_string($clean) || $clean === '') {
-            return null;
-        }
-
-        if (str_starts_with($clean, '00')) {
-            $clean = '+' . substr($clean, 2);
-        }
-
-        if (!str_starts_with($clean, '+')) {
-            $defaultCode = (string) config('services.sms.default_country_code', '+961');
-            $defaultCode = str_starts_with($defaultCode, '+') ? $defaultCode : '+' . $defaultCode;
-
-            if (str_starts_with($clean, '0')) {
-                $clean = substr($clean, 1);
-            }
-
-            $clean = $defaultCode . $clean;
-        }
-
-        return preg_match('/^\+\d{8,15}$/', $clean) === 1 ? $clean : null;
     }
 }

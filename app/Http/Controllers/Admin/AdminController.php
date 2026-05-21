@@ -3,34 +3,332 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Municipality, Office, ServiceRequest, User};
+use App\Events\SupportTicketMessageSent;
+use App\Models\{Municipality, Office, Service, ServiceRequest, SupportTicket, SupportTicketMessage, User};
+use App\Notifications\SupportTicketReplyNotification;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
-    // ── Dashboard ─────────────────────────────────────────────────
-    public function dashboard()
+    // Dashboard
+    public function dashboard(Request $request)
     {
+        $validated = $request->validate([
+            'period' => 'nullable|in:all,this_month,last_30,last_90,this_year',
+            'municipality_id' => 'nullable|integer|exists:municipalities,id',
+            'office_id' => 'nullable|integer|exists:offices,id',
+        ]);
+
+        $period = $validated['period'] ?? 'this_month';
+        $municipalityId = isset($validated['municipality_id']) ? (int) $validated['municipality_id'] : null;
+        $officeId = isset($validated['office_id']) ? (int) $validated['office_id'] : null;
+
+        if ($municipalityId && $officeId) {
+            $officeBelongsToMunicipality = Office::whereKey($officeId)
+                ->where('municipality_id', $municipalityId)
+                ->exists();
+
+            if (!$officeBelongsToMunicipality) {
+                $officeId = null;
+            }
+        }
+
+        [$currentStart, $currentEnd, $previousStart, $previousEnd, $periodLabel] = $this->resolveDashboardPeriod($period);
+
+        $municipalities = Municipality::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $officeOptionsQuery = Office::query()
+            ->with('municipality:id,name')
+            ->orderBy('name');
+
+        if ($municipalityId) {
+            $officeOptionsQuery->where('municipality_id', $municipalityId);
+        }
+
+        $officeOptions = $officeOptionsQuery->get(['id', 'name', 'municipality_id']);
+
+        // Requests and revenue (filter-aware)
+        $currentRequestsQuery = ServiceRequest::query();
+        $this->applyRequestDashboardScope($currentRequestsQuery, $currentStart, $currentEnd, $municipalityId, $officeId);
+
+        $previousRequestsQuery = ServiceRequest::query();
+        $this->applyRequestDashboardScope($previousRequestsQuery, $previousStart, $previousEnd, $municipalityId, $officeId);
+
+        $totalRequests = (clone $currentRequestsQuery)->count();
+        $previousTotalRequests = (clone $previousRequestsQuery)->count();
+
+        $pendingRequests = (clone $currentRequestsQuery)
+            ->where('status', 'pending')
+            ->count();
+
+        $currentRevenueTotals = $this->sumRevenueByCurrency($currentRequestsQuery);
+        $previousRevenueTotals = $this->sumRevenueByCurrency($previousRequestsQuery);
+        $revenueTrend = $this->buildRevenueTrend($currentRevenueTotals, $previousRevenueTotals);
+
+        // Platform totals with scope hints
+        $currentUsersQuery = User::query()->where('role', 'citizen');
+        if ($currentEnd) {
+            $currentUsersQuery->where('created_at', '<=', $currentEnd);
+        }
+        $totalUsers = $currentUsersQuery->count();
+
+        $previousUsersQuery = User::query()->where('role', 'citizen');
+        if ($previousEnd) {
+            $previousUsersQuery->where('created_at', '<=', $previousEnd);
+        }
+        $previousTotalUsers = $previousUsersQuery->count();
+
+        $currentOfficesQuery = Office::query();
+        if ($municipalityId) {
+            $currentOfficesQuery->where('municipality_id', $municipalityId);
+        }
+        if ($officeId) {
+            $currentOfficesQuery->whereKey($officeId);
+        }
+        if ($currentEnd) {
+            $currentOfficesQuery->where('created_at', '<=', $currentEnd);
+        }
+        $totalOffices = $currentOfficesQuery->count();
+
+        $previousOfficesQuery = Office::query();
+        if ($municipalityId) {
+            $previousOfficesQuery->where('municipality_id', $municipalityId);
+        }
+        if ($officeId) {
+            $previousOfficesQuery->whereKey($officeId);
+        }
+        if ($previousEnd) {
+            $previousOfficesQuery->where('created_at', '<=', $previousEnd);
+        }
+        $previousTotalOffices = $previousOfficesQuery->count();
+
         $stats = [
-            'total_users'       => User::where('role', 'citizen')->count(),
-            'total_offices'     => Office::count(),
-            'total_requests'    => ServiceRequest::count(),
-            'pending_requests'  => ServiceRequest::where('status', 'pending')->count(),
-            'total_revenue'     => ServiceRequest::where('payment_status', 'paid')->sum('amount_paid'),
-            'requests_this_month' => ServiceRequest::whereMonth('created_at', now()->month)->count(),
+            'total_users' => $totalUsers,
+            'total_offices' => $totalOffices,
+            'total_requests' => $totalRequests,
+            'pending_requests' => $pendingRequests,
+            'total_revenue_breakdown' => Service::formatCurrencyBreakdown($currentRevenueTotals),
+            'total_revenue_currency_count' => $currentRevenueTotals->count(),
         ];
 
-        $recentRequests = ServiceRequest::with(['citizen', 'service', 'office'])
-            ->latest()->limit(10)->get();
+        $trends = [
+            'total_users' => $this->buildTrend($totalUsers, $previousTotalUsers),
+            'total_offices' => $this->buildTrend($totalOffices, $previousTotalOffices),
+            'total_requests' => $this->buildTrend($totalRequests, $previousTotalRequests),
+            'total_revenue' => $revenueTrend,
+        ];
 
-        $officeStats = Office::withCount('requests')
-            ->orderBy('requests_count', 'desc')->limit(5)->get();
+        // Recent requests (filter-aware)
+        $recentRequestsQuery = ServiceRequest::with(['citizen', 'service', 'office'])
+            ->latest()
+            ->limit(10);
 
-        return view('admin.dashboard', compact('stats', 'recentRequests', 'officeStats'));
+        $this->applyRequestDashboardScope($recentRequestsQuery, $currentStart, $currentEnd, $municipalityId, $officeId);
+        $recentRequests = $recentRequestsQuery->get();
+
+        // Top offices (filter-aware)
+        $officeStatsQuery = Office::query()
+            ->with('municipality:id,name');
+
+        if ($municipalityId) {
+            $officeStatsQuery->where('municipality_id', $municipalityId);
+        }
+        if ($officeId) {
+            $officeStatsQuery->whereKey($officeId);
+        }
+
+        $officeStats = $officeStatsQuery
+            ->whereHas('requests', function (Builder $query) use ($currentStart, $currentEnd): void {
+                if ($currentStart && $currentEnd) {
+                    $query->whereBetween('created_at', [$currentStart, $currentEnd]);
+                }
+            })
+            ->withCount([
+                'requests as requests_count' => function (Builder $query) use ($currentStart, $currentEnd): void {
+                    if ($currentStart && $currentEnd) {
+                        $query->whereBetween('created_at', [$currentStart, $currentEnd]);
+                    }
+                },
+            ])
+            ->orderByDesc('requests_count')
+            ->limit(5)
+            ->get();
+
+        // Monthly chart data (year grid + current filter scope)
+        $monthlyRawQuery = ServiceRequest::query()
+            ->whereYear('created_at', now()->year);
+
+        $this->applyRequestDashboardScope($monthlyRawQuery, $currentStart, $currentEnd, $municipalityId, $officeId);
+
+        $monthlyRaw = $monthlyRawQuery
+            ->get(['created_at'])
+            ->groupBy(fn (ServiceRequest $request) => (int) $request->created_at->month)
+            ->map(fn ($requests) => $requests->count());
+
+        $chartLabels = [];
+        $chartValues = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $chartLabels[] = Carbon::create()->month($month)->format('M');
+            $chartValues[] = (int) ($monthlyRaw[$month] ?? 0);
+        }
+
+        $dashboardFilters = [
+            'period' => $period,
+            'period_label' => $periodLabel,
+            'municipality_id' => $municipalityId,
+            'office_id' => $officeId,
+            'is_scoped' => (bool) ($municipalityId || $officeId || $period !== 'this_month'),
+        ];
+
+        return view('admin.dashboard', compact(
+            'stats',
+            'trends',
+            'recentRequests',
+            'officeStats',
+            'municipalities',
+            'officeOptions',
+            'dashboardFilters',
+            'chartLabels',
+            'chartValues'
+        ));
     }
 
-    // ── Municipality Management ───────────────────────────────────
+    private function resolveDashboardPeriod(string $period): array
+    {
+        $now = Carbon::now();
+
+        return match ($period) {
+            'all' => [null, null, null, null, 'All time'],
+            'last_30' => [
+                $now->copy()->subDays(29)->startOfDay(),
+                $now->copy()->endOfDay(),
+                $now->copy()->subDays(59)->startOfDay(),
+                $now->copy()->subDays(30)->endOfDay(),
+                'Last 30 days',
+            ],
+            'last_90' => [
+                $now->copy()->subDays(89)->startOfDay(),
+                $now->copy()->endOfDay(),
+                $now->copy()->subDays(179)->startOfDay(),
+                $now->copy()->subDays(90)->endOfDay(),
+                'Last 90 days',
+            ],
+            'this_year' => [
+                $now->copy()->startOfYear(),
+                $now->copy()->endOfDay(),
+                $now->copy()->subYear()->startOfYear(),
+                $now->copy()->subYear()->endOfYear(),
+                'This year',
+            ],
+            default => [
+                $now->copy()->startOfMonth(),
+                $now->copy()->endOfDay(),
+                $now->copy()->subMonthNoOverflow()->startOfMonth(),
+                $now->copy()->subMonthNoOverflow()->endOfMonth(),
+                'This month',
+            ],
+        };
+    }
+
+    private function applyRequestDashboardScope(
+        Builder $query,
+        ?Carbon $start,
+        ?Carbon $end,
+        ?int $municipalityId,
+        ?int $officeId
+    ): void {
+        if ($start && $end) {
+            $query->whereBetween('service_requests.created_at', [$start, $end]);
+        }
+
+        if ($officeId) {
+            $query->where('service_requests.office_id', $officeId);
+            return;
+        }
+
+        if ($municipalityId) {
+            $query->whereHas('office', function (Builder $officeQuery) use ($municipalityId): void {
+                $officeQuery->where('municipality_id', $municipalityId);
+            });
+        }
+    }
+
+    private function sumRevenueByCurrency(Builder $query): Collection
+    {
+        return (clone $query)
+            ->where('service_requests.payment_status', 'paid')
+            ->selectRaw("UPPER(COALESCE(service_requests.service_currency, 'USD')) as currency")
+            ->selectRaw('SUM(COALESCE(service_requests.amount_paid, service_requests.service_price, 0)) as total')
+            ->groupBy('currency')
+            ->orderBy('currency')
+            ->pluck('total', 'currency')
+            ->map(fn ($total) => (float) $total);
+    }
+
+    private function buildRevenueTrend(Collection $currentTotals, Collection $previousTotals): array
+    {
+        $currencies = $currentTotals->keys()
+            ->merge($previousTotals->keys())
+            ->unique()
+            ->values();
+
+        if ($currencies->count() > 1) {
+            return ['text' => 'N/A', 'direction' => 'flat'];
+        }
+
+        $currency = $currencies->first();
+
+        if ($currency === null) {
+            return ['text' => '0%', 'direction' => 'flat'];
+        }
+
+        return $this->buildTrend(
+            $currentTotals->get($currency, 0),
+            $previousTotals->get($currency, 0)
+        );
+    }
+
+    private function buildTrend(float|int $current, float|int $previous): array
+    {
+        $currentValue = (float) $current;
+        $previousValue = (float) $previous;
+
+        if ($previousValue === 0.0) {
+            if ($currentValue === 0.0) {
+                return ['text' => '0%', 'direction' => 'flat'];
+            }
+
+            return ['text' => 'New', 'direction' => 'up'];
+        }
+
+        $delta = (($currentValue - $previousValue) / abs($previousValue)) * 100;
+        $roundedDelta = round($delta, 1);
+
+        if ($roundedDelta === 0.0) {
+            return ['text' => '0%', 'direction' => 'flat'];
+        }
+
+        $formatted = rtrim(rtrim(number_format(abs($roundedDelta), 1, '.', ''), '0'), '.');
+
+        return [
+            'text' => ($roundedDelta > 0 ? '+' : '-') . $formatted . '%',
+            'direction' => $roundedDelta > 0 ? 'up' : 'down',
+        ];
+    }
+
+    // Municipality Management
     public function municipalities()
     {
         $municipalities = Municipality::withCount('offices')->paginate(15);
@@ -65,7 +363,7 @@ class AdminController extends Controller
         return back()->with('success', 'Municipality deleted.');
     }
 
-    // ── Office Management ─────────────────────────────────────────
+    // Office Management
     public function offices()
     {
         $offices = Office::with('municipality')->paginate(15);
@@ -98,6 +396,10 @@ class AdminController extends Controller
             'name'            => 'required|string|max:255',
             'address'         => 'required|string',
             'municipality_id' => 'required|exists:municipalities,id',
+            'latitude'        => 'nullable|numeric',
+            'longitude'       => 'nullable|numeric',
+            'phone'           => 'nullable|string|max:20',
+            'email'           => 'nullable|email',
             'is_active'       => 'boolean',
         ]);
         $office->update($data);
@@ -110,18 +412,34 @@ class AdminController extends Controller
         return back()->with('success', 'Office deleted.');
     }
 
-    // ── User Management ───────────────────────────────────────────
+    // User Management
     public function users(Request $request)
     {
-        $query = User::query();
-        if ($request->role) $query->where('role', $request->role);
+        $query = User::query()->with('citizenVerifier:id,name');
+
+        if ($request->role) {
+            $query->where('role', $request->role);
+        }
+
+        if (in_array($request->verification_status, ['pending', 'approved', 'rejected', 'missing_document'], true)) {
+            $query->where('role', 'citizen');
+
+            if ($request->verification_status === 'missing_document') {
+                $query->whereNull('id_document');
+            } else {
+                $query->where('citizen_verification_status', $request->verification_status);
+            }
+        }
+
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('email', 'like', "%{$request->search}%");
+                  ->orWhere('email', 'like', "%{$request->search}%")
+                  ->orWhere('national_id', 'like', "%{$request->search}%");
             });
         }
-        $users = $query->paginate(20);
+
+        $users = $query->latest()->paginate(20)->withQueryString();
         return view('admin.users.index', compact('users'));
     }
 
@@ -146,6 +464,37 @@ class AdminController extends Controller
         return back()->with('success', 'Office user created.');
     }
 
+    public function updateUser(Request $request, User $user)
+    {
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:20'],
+        ];
+
+        if ($user->isCitizen()) {
+            $rules['national_id'] = ['nullable', 'string', 'max:50'];
+            $rules['citizen_verification_notes'] = ['nullable', 'string', 'max:500'];
+        }
+
+        $data = $request->validate($rules);
+
+        $payload = [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+        ];
+
+        if ($user->isCitizen()) {
+            $payload['national_id'] = $data['national_id'] ?? null;
+            $payload['citizen_verification_notes'] = $data['citizen_verification_notes'] ?? null;
+        }
+
+        $user->update($payload);
+
+        return back()->with('success', 'User information updated.');
+    }
+
     public function toggleUserStatus(User $user)
     {
         $user->update(['is_active' => !$user->is_active]);
@@ -153,26 +502,357 @@ class AdminController extends Controller
         return back()->with('success', "User account {$status}.");
     }
 
-    // ── Reporting ─────────────────────────────────────────────────
+    public function downloadCitizenIdentityDocument(User $user)
+    {
+        abort_unless($user->isCitizen(), 404);
+        abort_if(blank($user->id_document), 404);
+
+        $disk = Storage::disk('private');
+        abort_unless($disk->exists($user->id_document), 404);
+
+        $extension = pathinfo($user->id_document, PATHINFO_EXTENSION);
+        $filename = 'citizen-' . $user->id . '-national-id' . ($extension ? ".{$extension}" : '');
+
+        $path = $disk->path($user->id_document);
+        $mime = $disk->mimeType($user->id_document) ?: 'application/octet-stream';
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    public function approveCitizenIdentity(User $user)
+    {
+        abort_unless($user->isCitizen(), 404);
+
+        if (blank($user->id_document)) {
+            return back()->with('error', 'This citizen has not uploaded a National ID document yet.');
+        }
+
+        $user->forceFill([
+            'citizen_verification_status' => 'approved',
+            'citizen_verification_notes' => null,
+            'citizen_verified_at' => now(),
+            'citizen_verified_by' => auth()->id(),
+        ])->save();
+
+        return back()->with('success', 'Citizen identity approved.');
+    }
+
+    public function rejectCitizenIdentity(Request $request, User $user)
+    {
+        abort_unless($user->isCitizen(), 404);
+
+        if (blank($user->id_document)) {
+            return back()->with('error', 'This citizen has not uploaded a National ID document yet.');
+        }
+
+        $data = $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $user->forceFill([
+            'citizen_verification_status' => 'rejected',
+            'citizen_verification_notes' => array_key_exists('notes', $data)
+                ? $data['notes']
+                : $user->citizen_verification_notes,
+            'citizen_verified_at' => null,
+            'citizen_verified_by' => auth()->id(),
+        ])->save();
+
+        return back()->with('success', 'Citizen identity rejected.');
+    }
+
+    // Reporting
     public function reports()
     {
-        $requestsByOffice = Office::withCount('requests')
+        return view('admin.reports', $this->buildReportsData());
+    }
+
+    public function exportReportsPdf()
+    {
+        $data = $this->buildReportsData();
+
+        $totalRequests = $data['requestsByStatus']->sum();
+        $completed = $data['requestsByStatus']->get('completed', 0);
+
+        $data += [
+            'generatedAt' => now(),
+            'generatedBy' => auth()->user(),
+            'totalRequests' => $totalRequests,
+            'completionRate' => $totalRequests > 0 ? round(($completed / $totalRequests) * 100) : 0,
+            'pendingNow' => $data['requestsByStatus']->get('pending', 0),
+        ];
+
+        $pdf = Pdf::loadView('pdf.admin-report', $data)
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('reports-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    private function buildReportsData(): array
+    {
+        $requestsByOffice = Office::with('municipality:id,name')
+            ->withCount('requests')
             ->orderBy('requests_count', 'desc')->get();
 
-        $revenueByOffice = Office::withSum(
-            ['requests as revenue' => fn ($q) => $q->where('payment_status', 'paid')],
-            'amount_paid'
-        )->get();
+        $revenueByOfficeTotals = $this->buildRevenueByOfficeTotals();
+        $formattedRevenueByOffice = $requestsByOffice
+            ->mapWithKeys(fn (Office $office) => [
+                $office->id => Service::formatCurrencyBreakdown($revenueByOfficeTotals->get($office->id, collect())),
+            ])
+            ->all();
+        $revenueTotalsByCurrency = $this->sumOfficeRevenueTotals($revenueByOfficeTotals);
 
         $requestsByStatus = ServiceRequest::selectRaw('status, count(*) as total')
             ->groupBy('status')->pluck('total', 'status');
 
-        $monthlyRequests = ServiceRequest::selectRaw('MONTH(created_at) as month, COUNT(*) as total')
-            ->whereYear('created_at', now()->year)
-            ->groupBy('month')->pluck('total', 'month');
+        $monthlyRequests = ServiceRequest::whereBetween('created_at', [
+                now()->copy()->startOfYear(),
+                now()->copy()->endOfYear(),
+            ])
+            ->get(['created_at'])
+            ->groupBy(fn (ServiceRequest $request) => (int) $request->created_at->month)
+            ->map(fn ($requests) => $requests->count());
 
-        return view('admin.reports', compact(
-            'requestsByOffice', 'revenueByOffice', 'requestsByStatus', 'monthlyRequests'
+        return compact(
+            'requestsByOffice',
+            'formattedRevenueByOffice',
+            'revenueTotalsByCurrency',
+            'requestsByStatus',
+            'monthlyRequests'
+        ) + [
+            'formattedTotalRevenue' => Service::formatCurrencyBreakdown($revenueTotalsByCurrency),
+            'revenueCurrencyCount' => $revenueTotalsByCurrency->count(),
+        ];
+    }
+
+    private function buildRevenueByOfficeTotals(): Collection
+    {
+        return ServiceRequest::query()
+            ->where('service_requests.payment_status', 'paid')
+            ->selectRaw('service_requests.office_id as office_id')
+            ->selectRaw("UPPER(COALESCE(service_requests.service_currency, 'USD')) as currency")
+            ->selectRaw('SUM(COALESCE(service_requests.amount_paid, service_requests.service_price, 0)) as total')
+            ->groupBy('service_requests.office_id', 'currency')
+            ->orderBy('service_requests.office_id')
+            ->orderBy('currency')
+            ->get()
+            ->groupBy('office_id')
+            ->map(fn (Collection $rows) => $rows
+                ->pluck('total', 'currency')
+                ->map(fn ($total) => (float) $total));
+    }
+
+    private function sumOfficeRevenueTotals(Collection $revenueByOfficeTotals): Collection
+    {
+        return $revenueByOfficeTotals->reduce(function (Collection $carry, Collection $officeTotals) {
+            foreach ($officeTotals as $currency => $total) {
+                $carry->put($currency, (float) ($carry->get($currency, 0) + $total));
+            }
+
+            return $carry;
+        }, collect());
+    }
+
+    private function formatAmountForExport(float|int|string|null $amount, ?string $currency): string
+    {
+        if ($amount === null) {
+            return '';
+        }
+
+        return Service::formatCurrencyAmount($amount, $currency, false);
+    }
+
+    // ── CSV Exports ───────────────────────────────────────────────
+    public function exportReport(string $type)
+    {
+        $formattedRevenueByOffice = $this->buildRevenueByOfficeTotals()
+            ->map(fn (Collection $totals) => Service::formatCurrencyBreakdown($totals));
+
+        return match ($type) {
+            'requests' => $this->streamCsv(
+                'requests-' . now()->format('Y-m-d') . '.csv',
+                ['Reference', 'Citizen', 'Service', 'Office', 'Municipality', 'Status', 'Payment Status', 'Currency', 'Quoted Amount', 'Submitted At', 'Completed At'],
+                ServiceRequest::with(['citizen:id,name', 'service:id,name,currency', 'office:id,name,municipality_id', 'office.municipality:id,name'])
+                    ->orderByDesc('created_at')
+                    ->lazy()
+                    ->map(fn ($r) => [
+                        $r->reference_number,
+                        optional($r->citizen)->name ?? '-',
+                        $r->resolved_service_name,
+                        optional($r->office)->name ?? '-',
+                        optional(optional($r->office)->municipality)->name ?? '-',
+                        $r->status,
+                        $r->payment_status,
+                        $r->resolved_service_currency,
+                        $this->formatAmountForExport($r->resolved_service_price, $r->resolved_service_currency),
+                        optional($r->created_at)->toDateTimeString() ?? '',
+                        optional($r->completed_at)->toDateTimeString() ?? '',
+                    ]),
+            ),
+            'payments' => $this->streamCsv(
+                'payments-' . now()->format('Y-m-d') . '.csv',
+                ['Reference', 'Citizen', 'Service', 'Office', 'Method', 'Transaction ID', 'Currency', 'Amount', 'Paid At'],
+                ServiceRequest::with(['citizen:id,name', 'service:id,name,currency', 'office:id,name'])
+                    ->where('payment_status', 'paid')
+                    ->orderByDesc('updated_at')
+                    ->lazy()
+                    ->map(fn ($r) => [
+                        $r->reference_number,
+                        optional($r->citizen)->name ?? '-',
+                        $r->resolved_service_name,
+                        optional($r->office)->name ?? '-',
+                        $r->payment_method ?? '-',
+                        $r->transaction_id ?? '-',
+                        $r->resolved_service_currency,
+                        $this->formatAmountForExport($r->recorded_amount, $r->resolved_service_currency),
+                        optional($r->updated_at)->toDateTimeString() ?? '',
+                    ]),
+            ),
+            'offices' => $this->streamCsv(
+                'offices-' . now()->format('Y-m-d') . '.csv',
+                ['Office', 'Municipality', 'Requests', 'Revenue by Currency'],
+                Office::withCount('requests')
+                    ->with('municipality:id,name')
+                    ->orderByDesc('requests_count')
+                    ->get()
+                    ->map(fn ($o) => [
+                        $o->name,
+                        optional($o->municipality)->name ?? '-',
+                        $o->requests_count,
+                        $formattedRevenueByOffice->get($o->id, '0'),
+                    ]),
+            ),
+            default => abort(404),
+        };
+    }
+
+    private function streamCsv(string $filename, array $headers, iterable $rows): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return response()->streamDownload(function () use ($headers, $rows) {
+            $out = fopen('php://output', 'w');
+            // UTF-8 BOM so Excel renders Arabic / accented characters correctly.
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $headers);
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Cache-Control'       => 'no-store, no-cache, must-revalidate',
+        ]);
+    }
+
+    // ── Support Tickets ───────────────────────────────────────────
+    public function supportIndex(Request $request)
+    {
+        $status = $request->input('status');
+        $search = trim((string) $request->input('search', ''));
+
+        $query = SupportTicket::query()->with('user:id,name,email');
+
+        if (in_array($status, ['open', 'answered', 'closed'], true)) {
+            $query->where('status', $status);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('subject', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($qq) use ($search) {
+                      $qq->where('name', 'like', "%{$search}%")
+                         ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $tickets = $query
+            ->withCount(['messages as unread_admin' => function ($q) {
+                $q->where('sender_id', '!=', auth()->id())->whereNull('read_at');
+            }])
+            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'answered' THEN 1 ELSE 2 END")
+            ->latest('updated_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $counts = [
+            'open'     => SupportTicket::where('status', 'open')->count(),
+            'answered' => SupportTicket::where('status', 'answered')->count(),
+            'closed'   => SupportTicket::where('status', 'closed')->count(),
+        ];
+
+        return view('admin.support.index', compact('tickets', 'counts', 'status', 'search'));
+    }
+
+    public function supportShow(SupportTicket $ticket)
+    {
+        $ticket->load(['messages.sender', 'user']);
+
+        $ticket->messages()
+            ->where('sender_id', '!=', auth()->id())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return view('admin.support.show', compact('ticket'));
+    }
+
+    public function supportReply(Request $request, SupportTicket $ticket)
+    {
+        abort_if($ticket->status === 'closed', 403, 'This ticket is closed.');
+
+        $data = $request->validate([
+            'body'       => 'required|string|max:5000',
+            'attachment' => 'nullable|file|max:5120|mimes:jpg,jpeg,png,gif,pdf,doc,docx,txt',
+        ]);
+
+        $attachmentData = [];
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $attachmentData = [
+                'attachment'      => $file->store('support-attachments', 'public'),
+                'attachment_name' => $file->getClientOriginalName(),
+                'attachment_size' => $file->getSize(),
+            ];
+        }
+
+        $newMessage = DB::transaction(function () use ($data, $ticket, $attachmentData) {
+            $msg = SupportTicketMessage::create(array_merge([
+                'support_ticket_id' => $ticket->id,
+                'sender_id' => auth()->id(),
+                'body'      => $data['body'],
+            ], $attachmentData));
+
+            $ticket->update([
+                'status' => 'answered',
+                'last_reply_at' => now(),
+            ]);
+
+            return $msg;
+        });
+
+        broadcast(new SupportTicketMessageSent($newMessage))->toOthers();
+
+        $ticket->user->notify(new SupportTicketReplyNotification(
+            $ticket,
+            Str::limit($data['body'], 140),
+            auth()->user()->name,
+            'admin',
         ));
+
+        return back()->with('success', 'Reply sent to citizen.');
+    }
+
+    public function supportClose(SupportTicket $ticket)
+    {
+        $ticket->update(['status' => 'closed']);
+        return back()->with('success', 'Ticket closed.');
+    }
+
+    public function supportReopen(SupportTicket $ticket)
+    {
+        $ticket->update(['status' => 'answered']);
+        return back()->with('success', 'Ticket reopened.');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Notifications\RegistrationConfirmation;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -64,16 +65,19 @@ class AuthController extends Controller
             'national_id' => $data['national_id'],
             'phone'       => $data['phone'] ?? null,
             'id_document' => $docPath,   // ← correct column name
+            'citizen_verification_status' => 'pending',
             'role'        => 'citizen',
             'is_active'   => true,
         ]);
 
         $user->notify(new RegistrationConfirmation());
 
+        // Triggers SendEmailVerificationNotification → email with signed verify link.
+        event(new Registered($user));
+
         Auth::login($user);
         $request->session()->regenerate();
-        return redirect()->route('citizen.dashboard')
-                         ->with('success', 'Welcome to E-Services!');
+        return $this->redirectByRole($user);
     }
 
     public function extractNationalIdDocument(Request $request): JsonResponse
@@ -161,6 +165,10 @@ class AuthController extends Controller
         $nationalId = $this->extractAzureFieldString($fields, [
             'DocumentNumber', 'NationalId', 'NationalID', 'IdNumber', 'IDNumber',
         ]);
+
+        if ($nationalId) {
+            $nationalId = preg_replace('/\D/u', '', $this->normalizeUnicodeDigits($nationalId));
+        }
 
         $content = (string) data_get($analyzeResult, 'content', '');
         if (!$nationalId && $content !== '') {
@@ -287,7 +295,7 @@ class AuthController extends Controller
             session(['2fa_setup_secret' => $secret]);
         }
 
-        $issuer = config('app.name', 'E-Services');
+        $issuer = config('app.name', 'CedarGov');
         $label = rawurlencode($issuer . ':' . $user->email);
         $issuerEncoded = rawurlencode($issuer);
         $otpAuthUrl = "otpauth://totp/{$label}?secret={$secret}&issuer={$issuerEncoded}&algorithm=SHA1&digits=6&period=30";
@@ -529,6 +537,7 @@ class AuthController extends Controller
                 'social_provider' => $payload['provider'] ?? null,
                 'social_id'       => $payload['social_id'] ?? null,
                 'avatar'          => $payload['avatar'] ?? null,
+                'citizen_verification_status' => 'pending',
                 'is_active'       => true,
                 'email_verified_at' => now(),
             ]);
@@ -913,11 +922,6 @@ class AuthController extends Controller
 
     private function redirectByRole(User $user): \Illuminate\Http\RedirectResponse
     {
-        if ($user->role === 'citizen' && !$user->hasCompletedCitizenProfile()) {
-            return redirect()->route('citizen.profile')
-                ->with('info', 'Please complete your profile before submitting requests.');
-        }
-
         return match ($user->role) {
             'admin'       => redirect()->route('admin.dashboard'),
             'office_user' => redirect()->route('office.dashboard'),

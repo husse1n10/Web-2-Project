@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ServiceRequest;
+use App\Models\SupportTicket;
 use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -18,6 +19,16 @@ Broadcast::channel('office.{officeId}', function (User $user, int $officeId): bo
     }
 
     return $user->offices()->where('offices.id', $officeId)->exists();
+});
+
+Broadcast::channel('support-ticket.{ticketId}', function (User $user, int $ticketId): bool {
+    if ($user->isAdmin()) {
+        return true;
+    }
+
+    $ticket = SupportTicket::query()->select(['id', 'user_id'])->find($ticketId);
+
+    return $ticket !== null && $ticket->user_id === $user->id;
 });
 
 Broadcast::channel('request.{requestId}', function (User $user, int $requestId): bool {

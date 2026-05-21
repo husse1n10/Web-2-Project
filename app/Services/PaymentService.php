@@ -3,15 +3,30 @@
 namespace App\Services;
 
 use App\Models\ServiceRequest;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Stripe\Stripe;
+use Stripe\Checkout\Session as StripeSession;
+use Stripe\Exception\ApiErrorException;
+use Stripe\HttpClient\CurlClient;
 
-/**
- * PaymentService
- * Handles card payments (via Stripe) and crypto payments.
- * Replace TODO sections with your actual provider SDK calls.
- */
 class PaymentService
 {
+    private const SUPPORTED_CRYPTO_CURRENCIES = [
+        'btc' => 'btc',
+        'usdterc20' => 'usdterc20',
+    ];
+
+    public function __construct()
+    {
+        Stripe::setApiKey(config('services.stripe.secret'));
+        Stripe::setMaxNetworkRetries(0);
+        CurlClient::instance()->setTimeout(30);
+        CurlClient::instance()->setConnectTimeout(10);
+    }
+
     public function process(ServiceRequest $serviceRequest, string $method, array $payload): array
     {
         return match ($method) {
@@ -21,59 +36,237 @@ class PaymentService
         };
     }
 
-    // ── Card Payment (Stripe) ─────────────────────────────────────
+    public static function toMinorUnit(float|int|string $amount): int
+    {
+        return (int) round(((float) $amount) * 100, 0, PHP_ROUND_HALF_UP);
+    }
+
+    // ── Card Payment (Stripe Checkout Session) ─────────────────────
     private function processCard(ServiceRequest $req, array $payload): array
     {
         try {
-            // TODO: Replace with actual Stripe integration
-            // \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-            // $charge = \Stripe\Charge::create([
-            //     'amount'   => (int) ($req->service->price * 100),
-            //     'currency' => strtolower($req->service->currency),
-            //     'source'   => $payload['stripe_token'],
-            //     'description' => 'Service Request: ' . $req->reference_number,
-            // ]);
-            // return ['success' => true, 'transaction_id' => $charge->id];
+            $serviceCurrency = strtolower($req->resolved_service_currency);
+            $serviceName = $req->resolved_service_name;
+            $servicePrice = $req->resolved_service_price;
 
-            // Simulated success for development
-            return ['success' => true, 'transaction_id' => 'SIM_CARD_' . Str::upper(Str::random(10))];
+            $session = StripeSession::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency'     => $serviceCurrency,
+                        'product_data' => [
+                            'name'        => $serviceName,
+                            'description' => 'Service Request: ' . $req->reference_number,
+                        ],
+                        'unit_amount' => self::toMinorUnit($servicePrice),
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode'        => 'payment',
+                'success_url' => route('citizen.payment.success', $req) . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url'  => route('citizen.payment.cancel', $req),
+                'metadata'    => [
+                    'service_request_id' => $req->id,
+                    'reference_number'   => $req->reference_number,
+                ],
+            ]);
 
+            return [
+                'success'      => true,
+                'redirect_url' => $session->url,
+                'session_id'   => $session->id,
+            ];
+        } catch (ApiErrorException $e) {
+            return ['success' => false, 'message' => 'Stripe error: ' . $e->getMessage()];
         } catch (\Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
+            return ['success' => false, 'message' => 'Could not connect to payment processor. Please try again.'];
         }
     }
 
-    // ── Crypto Payment ────────────────────────────────────────────
-    private function processCrypto(ServiceRequest $req, array $payload): array
+    // ── Verify Stripe Session ──────────────────────────────────────
+    public function verifyStripeSession(string $sessionId, ServiceRequest $req): array
     {
         try {
-            // TODO: Replace with actual crypto provider (e.g., Coinbase Commerce, NOWPayments)
-            // $api     = app(CryptoApiClient::class);
-            // $charge  = $api->createCharge([
-            //     'name'        => 'Service Request',
-            //     'description' => $req->reference_number,
-            //     'amount'      => $req->service->price,
-            //     'currency'    => $req->service->currency,
-            // ]);
-            // return ['success' => true, 'transaction_id' => $charge->id];
+            $session = StripeSession::retrieve($sessionId);
 
-            // Simulated success for development
-            return ['success' => true, 'transaction_id' => 'SIM_CRYPTO_' . Str::upper(Str::random(10))];
+            if ($session->payment_status !== 'paid') {
+                return ['success' => false, 'message' => 'Payment not completed.'];
+            }
 
-        } catch (\Exception $e) {
+            // Reject sessions that belong to a different ServiceRequest — without
+            // this check a paid session_id from one request could be replayed on
+            // another to mark it paid for free.
+            if ((int) ($session->metadata['service_request_id'] ?? 0) !== (int) $req->id) {
+                return ['success' => false, 'message' => 'Payment session does not match this request.'];
+            }
+
+            // Confirm the amount paid matches the expected price to prevent
+            // a $1 session being replayed against a $1000 request.
+            $expectedCents = self::toMinorUnit($req->resolved_service_price);
+            if ((int) $session->amount_total !== $expectedCents) {
+                return ['success' => false, 'message' => 'Payment amount does not match the request price.'];
+            }
+
+            $expectedCurrency = strtolower($req->resolved_service_currency);
+            if (strtolower((string) ($session->currency ?? '')) !== $expectedCurrency) {
+                return ['success' => false, 'message' => 'Payment currency does not match the request.'];
+            }
+
+            return [
+                'success'        => true,
+                'transaction_id' => $session->payment_intent,
+            ];
+        } catch (ApiErrorException $e) {
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
-    // ── Currency Conversion ───────────────────────────────────────
+    // ── Crypto Payment (NOWPayments hosted invoice) ────────────────
+    // Creates an invoice on NOWPayments and returns the hosted invoice URL.
+    // The citizen completes payment on NOWPayments' page; we get the final
+    // status via the IPN webhook (see WebhookController::nowpayments).
+    private function processCrypto(ServiceRequest $req, array $payload): array
+    {
+        $apiKey  = config('services.nowpayments.api_key');
+        $baseUrl = rtrim((string) config('services.nowpayments.base_url'), '/');
+        $servicePrice = (float) $req->resolved_service_price;
+        $serviceCurrency = strtolower($req->resolved_service_currency);
+        $payCurrency = $this->normalizeCryptoCurrency($payload['crypto_currency'] ?? 'btc');
+
+        if (empty($apiKey)) {
+            return [
+                'success' => false,
+                'message' => 'Crypto payments are not configured. Please use card payment.',
+            ];
+        }
+
+        if ($payCurrency === null) {
+            return [
+                'success' => false,
+                'message' => 'Unsupported cryptocurrency selected. Please choose BTC or USDT ERC20.',
+            ];
+        }
+
+        $minCheck = $this->checkCryptoMinimum($baseUrl, $apiKey, $payCurrency, $serviceCurrency, $servicePrice);
+        if (!$minCheck['ok']) {
+            return ['success' => false, 'message' => $minCheck['message']];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                    'x-api-key'    => $apiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->timeout(20)
+                ->post("{$baseUrl}/invoice", [
+                    'price_amount'      => $servicePrice,
+                    'price_currency'    => $serviceCurrency,
+                    'pay_currency'      => $payCurrency,
+                    'order_id'          => (string) $req->id,
+                    'order_description' => 'Service Request: ' . $req->reference_number,
+                    'ipn_callback_url'  => route('webhooks.nowpayments'),
+                    'success_url'       => route('citizen.payment.success', $req),
+                    'cancel_url'        => route('citizen.payment.cancel', $req),
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('NOWPayments invoice creation failed.', [
+                    'status' => $response->status(),
+                    'body'   => Str::limit($response->body(), 400),
+                ]);
+                return ['success' => false, 'message' => 'Could not create crypto invoice. Please try again.'];
+            }
+
+            $data = $response->json();
+            $invoiceUrl = $data['invoice_url'] ?? null;
+            $invoiceId  = $data['id'] ?? null;
+
+            if (empty($invoiceUrl)) {
+                return ['success' => false, 'message' => 'Crypto provider returned an invalid response.'];
+            }
+
+            return [
+                'success'     => true,
+                'invoice_id'  => (string) $invoiceId,
+                'invoice_url' => (string) $invoiceUrl,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('NOWPayments invoice request threw: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Could not connect to crypto payment processor. Please try again.'];
+        }
+    }
+
+    private function checkCryptoMinimum(string $baseUrl, string $apiKey, string $payCurrency, string $fiatCurrency, float $amount): array
+    {
+        try {
+            $response = Http::withHeaders(['x-api-key' => $apiKey])
+                ->timeout(10)
+                ->get("{$baseUrl}/min-amount", [
+                    'currency_from'   => $payCurrency,
+                    'fiat_equivalent' => $fiatCurrency,
+                ]);
+
+            if (!$response->successful()) {
+                return ['ok' => true];
+            }
+
+            $minFiat = $response->json('fiat_equivalent');
+            if ($minFiat === null || $amount >= (float) $minFiat) {
+                return ['ok' => true];
+            }
+
+            $coin = strtoupper($payCurrency);
+            $minFmt = number_format((float) $minFiat, 2);
+            $fiat = strtoupper($fiatCurrency);
+            return [
+                'ok'      => false,
+                'message' => "The amount is too small for {$coin}. Minimum is approximately {$minFmt} {$fiat}. Please choose a USDT network or another cryptocurrency with lower fees.",
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('NOWPayments min-amount check failed: ' . $e->getMessage());
+            return ['ok' => true];
+        }
+    }
+
+    private function normalizeCryptoCurrency(string $currency): ?string
+    {
+        $normalized = strtolower(trim($currency));
+
+        return self::SUPPORTED_CRYPTO_CURRENCIES[$normalized] ?? null;
+    }
+
+    // ── Currency Conversion ────────────────────────────────────────
     public function convertCurrency(float $amount, string $from, string $to): float
     {
-        // TODO: Integrate currency exchange API
-        // e.g., https://exchangerate-api.com or https://openexchangerates.org
-        // $rate = Http::get("https://api.exchangerate-api.com/v4/latest/{$from}")
-        //             ->json("rates.{$to}");
-        // return round($amount * $rate, 2);
+        if ($from === $to) {
+            return $amount;
+        }
 
-        return $amount; // fallback: same amount
+        $cacheKey = "exchange_rate_{$from}_{$to}";
+
+        $rate = Cache::remember($cacheKey, 3600, function () use ($from, $to) {
+            try {
+                $response = Http::timeout(5)->get(
+                    "https://api.exchangerate-api.com/v4/latest/{$from}"
+                );
+
+                if ($response->successful()) {
+                    return $response->json("rates.{$to}");
+                }
+            } catch (\Exception $e) {
+                // Fail silently, use fallback
+            }
+
+            // Fallback rates
+            $fallback = [
+                'USD' => ['LBP' => 89500, 'EUR' => 0.92],
+                'LBP' => ['USD' => 0.0000112, 'EUR' => 0.0000103],
+                'EUR' => ['USD' => 1.09, 'LBP' => 97000],
+            ];
+
+            return $fallback[$from][$to] ?? 1;
+        });
+
+        return round($amount * $rate, 2);
     }
 }

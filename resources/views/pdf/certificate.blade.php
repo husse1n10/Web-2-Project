@@ -92,7 +92,7 @@
 
         <div class="service-box">
             <div class="svc-label">Service</div>
-            <div class="svc-name">{{ $serviceRequest->service->name }}</div>
+            <div class="svc-name">{{ $serviceRequest->resolved_service_name }}</div>
             <div class="svc-ref">Ref: {{ $serviceRequest->reference_number }}</div>
         </div>
 
@@ -136,7 +136,7 @@
     </div>
 
     <div class="cert-footer">
-        <span>E-Services Government Platform &copy; {{ date('Y') }} — This is an official document.</span>
+        <span>CedarGov Platform &copy; {{ date('Y') }} — This is an official document.</span>
         <span>Generated: {{ now()->format('M d, Y H:i') }} | Ref: {{ $serviceRequest->reference_number }}</span>
     </div>
 

@@ -3,135 +3,323 @@
 @section('page-title', 'Complete Payment')
 
 @section('content')
-<div style="max-width:520px;margin:0 auto">
-    {{-- Order summary --}}
+@php
+    $citizenActionLocked = auth()->user()->isCitizen() && !auth()->user()->canUseCitizenSelfServiceActions();
+@endphp
+<div class="citizen-payment-shell citizen-reveal" data-citizen-reveal>
     <div class="card mb-3">
         <div class="card-body">
-            <div style="display:flex;align-items:center;gap:.85rem">
-                <div style="width:44px;height:44px;border-radius:12px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">
+            <div class="citizen-payment-summary-row">
+                <div class="citizen-payment-summary-icon">
                     <i class="bi bi-receipt"></i>
                 </div>
-                <div style="flex:1;min-width:0">
-                    <div style="font-size:.88rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $serviceRequest->service->name }}</div>
-                    <div style="font-size:.75rem;color:#9ca3af">{{ $serviceRequest->office->name }}</div>
+                <div class="citizen-payment-summary-main">
+                    <div class="citizen-payment-summary-title">{{ $serviceRequest->resolved_service_name }}</div>
+                    <div class="citizen-payment-summary-sub">{{ $serviceRequest->office->name }}</div>
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                    <div style="font-size:1.2rem;font-weight:800;color:var(--primary)">${{ number_format($serviceRequest->service->price, 2) }}</div>
-                    <div style="font-size:.7rem;color:#9ca3af">{{ $serviceRequest->service->currency }}</div>
+                <div class="citizen-payment-summary-price">
+                    <div class="citizen-payment-summary-amount">{{ $serviceRequest->formatted_service_price_value }}</div>
+                    <div class="citizen-payment-summary-currency">{{ $serviceRequest->resolved_service_currency }}</div>
                 </div>
             </div>
-            <div style="border-top:1px solid #f3f4f6;margin-top:.9rem;padding-top:.75rem;display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:.75rem;color:#9ca3af">Reference</span>
+            <div class="citizen-payment-ref-row">
+                <span>Reference</span>
                 <code>{{ $serviceRequest->reference_number }}</code>
             </div>
         </div>
     </div>
 
-    {{-- Payment form --}}
+    @if($errors->has('payment'))
+        <div class="alert alert-danger mb-3">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ $errors->first('payment') }}
+        </div>
+    @endif
+
+    @if($citizenActionLocked)
+        <div class="alert alert-warning mb-3">
+            <i class="bi bi-lock me-1"></i>{{ __('Finish your profile verification to unlock payments.') }}
+        </div>
+    @endif
+
     <div class="card">
-        <div class="card-header"><span class="card-title">Select Payment Method</span></div>
+        <div class="card-header">
+            <span class="card-title">Select Payment Method</span>
+        </div>
         <div class="card-body">
             <form action="{{ route('citizen.payment.process', $serviceRequest) }}" method="POST" id="payForm">
                 @csrf
 
-                {{-- Method selector --}}
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1.25rem">
-                    <label style="cursor:pointer">
-                        <input type="radio" name="payment_method" value="card" class="pm-radio d-none" required>
-                        <div class="pm-option" data-method="card" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:.9rem;text-align:center;transition:all .15s">
-                            <i class="bi bi-credit-card-2-front" style="font-size:1.5rem;color:var(--primary);display:block;margin-bottom:.35rem"></i>
-                            <div style="font-size:.78rem;font-weight:700;color:#374151">Card</div>
-                            <div style="font-size:.66rem;color:#9ca3af">Visa / MC</div>
-                        </div>
+                <div class="citizen-payment-method-grid">
+                    <label class="citizen-payment-method-item">
+                        <input type="radio" name="payment_method" value="card" class="pm-radio" required @disabled($citizenActionLocked)>
+                        <span class="pm-option" data-method="card">
+                            <i class="bi bi-credit-card-2-front"></i>
+                            <span class="pm-option-title">Card</span>
+                            <span class="pm-option-sub">Visa / MC</span>
+                        </span>
                     </label>
-                    <label style="cursor:pointer">
-                        <input type="radio" name="payment_method" value="crypto" class="pm-radio d-none">
-                        <div class="pm-option" data-method="crypto" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:.9rem;text-align:center;transition:all .15s">
-                            <i class="bi bi-currency-bitcoin" style="font-size:1.5rem;color:#f59e0b;display:block;margin-bottom:.35rem"></i>
-                            <div style="font-size:.78rem;font-weight:700;color:#374151">Crypto</div>
-                            <div style="font-size:.66rem;color:#9ca3af">BTC / ETH / USDT</div>
-                        </div>
+                    <label class="citizen-payment-method-item">
+                        <input type="radio" name="payment_method" value="crypto" class="pm-radio" @disabled($citizenActionLocked)>
+                        <span class="pm-option" data-method="crypto">
+                            <i class="bi bi-currency-bitcoin"></i>
+                            <span class="pm-option-title">Crypto</span>
+                            <span class="pm-option-sub">BTC / USDT ERC20</span>
+                        </span>
                     </label>
                 </div>
 
-                {{-- Card fields --}}
-                <div id="cardFields" style="display:none">
-                    <div class="mb-3">
-                        <label class="form-label">Card Number</label>
-                        <input type="text" id="cardNum" class="form-control" placeholder="1234  5678  9012  3456" maxlength="19" inputmode="numeric">
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.75rem">
-                        <div>
-                            <label class="form-label">Expiry</label>
-                            <input type="text" class="form-control" placeholder="MM / YY" maxlength="7" inputmode="numeric">
-                        </div>
-                        <div>
-                            <label class="form-label">CVV</label>
-                            <input type="text" class="form-control" placeholder="123" maxlength="4" inputmode="numeric">
-                        </div>
-                    </div>
-                    <div class="mb-1">
-                        <label class="form-label">Cardholder Name</label>
-                        <input type="text" class="form-control" placeholder="{{ auth()->user()->name }}" autocomplete="cc-name">
+                <div id="cardFields" class="citizen-payment-fieldset" hidden>
+                    <div class="citizen-payment-info is-card">
+                        <i class="bi bi-shield-lock-fill"></i>
+                        <span>You will be redirected to Stripe secure checkout to complete your card payment.</span>
                     </div>
                 </div>
 
-                {{-- Crypto fields --}}
-                <div id="cryptoFields" style="display:none">
+                <div id="cryptoFields" class="citizen-payment-fieldset" hidden>
                     <div class="mb-3">
                         <label class="form-label">Select Cryptocurrency</label>
-                        <select name="crypto_currency" class="form-select">
+                        <select name="crypto_currency" class="form-select" @disabled($citizenActionLocked)>
                             <option value="BTC">Bitcoin (BTC)</option>
-                            <option value="ETH">Ethereum (ETH)</option>
-                            <option value="USDT">Tether USDT</option>
+                            <option value="USDTERC20" selected>Tether (USDT ERC20)</option>
                         </select>
                     </div>
-                    <div style="background:#eff6ff;border-radius:8px;padding:.75rem;font-size:.79rem;color:#1e40af;display:flex;align-items:flex-start;gap:.5rem">
-                        <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px"></i>
-                        <span>You will be redirected to complete the crypto payment after confirming.</span>
+                    <div class="citizen-payment-info is-crypto">
+                        <i class="bi bi-info-circle"></i>
+                        <span>After clicking pay, you will get the wallet address and exact amount to send.</span>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block mt-3" style="padding:.7rem">
-                    <i class="bi bi-lock-fill"></i> Pay Securely
+                <button type="submit" class="btn btn-primary w-100 mt-3 citizen-pay-submit" id="payBtn" @disabled($citizenActionLocked)>
+                    <i class="bi {{ $citizenActionLocked ? 'bi-lock-fill' : 'bi-shield-check' }} me-1"></i>
+                    {{ $citizenActionLocked ? __('Profile Verification Required') : __('Pay Securely') }}
                 </button>
             </form>
 
-            <div style="text-align:center;margin-top:.9rem;font-size:.72rem;color:#9ca3af;display:flex;align-items:center;justify-content:center;gap:.3rem">
-                <i class="bi bi-shield-check" style="color:#16a34a"></i>
-                256-bit SSL encryption · Your data is safe
+            <div class="citizen-payment-safe-note">
+                <i class="bi bi-shield-check"></i>
+                <span>256-bit SSL encryption &middot; Your data is safe</span>
             </div>
         </div>
     </div>
 </div>
+@endsection
 
 @push('styles')
 <style>
-.pm-option:hover { border-color: var(--primary) !important; background: var(--primary-light); }
-.pm-radio:checked + .pm-option {
-    border-color: var(--primary) !important;
-    background: var(--primary-light);
-    box-shadow: 0 0 0 3px rgba(0,82,204,.1);
+body.es-role-citizen .citizen-payment-shell {
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+body.es-role-citizen .citizen-payment-summary-row {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+}
+
+body.es-role-citizen .citizen-payment-summary-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: .72rem;
+    background: #E0F2FE;
+    color: #0284C7;
+    border: 1px solid #BAE6FD;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    flex-shrink: 0;
+}
+
+body.es-role-citizen .citizen-payment-summary-main {
+    flex: 1;
+    min-width: 0;
+}
+
+body.es-role-citizen .citizen-payment-summary-title {
+    font-size: .88rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body.es-role-citizen .citizen-payment-summary-sub {
+    font-size: .75rem;
+    color: #64748B;
+}
+
+body.es-role-citizen .citizen-payment-summary-price {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+body.es-role-citizen .citizen-payment-summary-amount {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #0284C7;
+    line-height: 1.1;
+}
+
+body.es-role-citizen .citizen-payment-summary-currency {
+    font-size: .7rem;
+    color: #94A3B8;
+}
+
+body.es-role-citizen .citizen-payment-ref-row {
+    border-top: 1px solid #E2E8F0;
+    margin-top: .9rem;
+    padding-top: .75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .75rem;
+    color: #64748B;
+}
+
+body.es-role-citizen .citizen-payment-method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .65rem;
+    margin-bottom: 1.25rem;
+}
+
+body.es-role-citizen .citizen-payment-method-item {
+    cursor: pointer;
+}
+
+body.es-role-citizen .pm-radio {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.es-role-citizen .pm-option {
+    border: 1.5px solid #E2E8F0;
+    border-radius: .7rem;
+    padding: .9rem;
+    text-align: center;
+    transition: all .15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+body.es-role-citizen .pm-option i {
+    font-size: 1.5rem;
+    margin-bottom: .3rem;
+}
+
+body.es-role-citizen .pm-option[data-method="card"] i {
+    color: #0284C7;
+}
+
+body.es-role-citizen .pm-option[data-method="crypto"] i {
+    color: #D97706;
+}
+
+body.es-role-citizen .pm-option-title {
+    font-size: .78rem;
+    font-weight: 700;
+    color: #334155;
+    line-height: 1.2;
+}
+
+body.es-role-citizen .pm-option-sub {
+    font-size: .66rem;
+    color: #94A3B8;
+    line-height: 1.2;
+    margin-top: .1rem;
+}
+
+body.es-role-citizen .pm-option:hover {
+    border-color: #7DD3FC;
+    background: #F0F9FF;
+}
+
+body.es-role-citizen .pm-radio:checked + .pm-option {
+    border-color: #0284C7;
+    background: #E0F2FE;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, .14);
+}
+
+body.es-role-citizen .citizen-payment-fieldset {
+    margin-top: .2rem;
+}
+
+body.es-role-citizen .citizen-payment-info {
+    border-radius: .6rem;
+    padding: .82rem;
+    font-size: .81rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .45rem;
+}
+
+body.es-role-citizen .citizen-payment-info i {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+body.es-role-citizen .citizen-payment-info.is-card {
+    background: #EFF6FF;
+    color: #1E40AF;
+}
+
+body.es-role-citizen .citizen-payment-info.is-crypto {
+    background: #EEF6FF;
+    color: #1D4ED8;
+}
+
+body.es-role-citizen .citizen-pay-submit {
+    padding: .7rem;
+}
+
+body.es-role-citizen .citizen-payment-safe-note {
+    text-align: center;
+    margin-top: .9rem;
+    font-size: .72rem;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+}
+
+body.es-role-citizen .citizen-payment-safe-note i {
+    color: #16A34A;
+}
+
+@media (max-width: 575.98px) {
+    body.es-role-citizen .citizen-payment-method-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 @endpush
 
 @push('scripts')
 <script>
-document.querySelectorAll('.pm-radio').forEach(r => {
-    r.addEventListener('change', () => {
-        document.getElementById('cardFields').style.display   = 'none';
-        document.getElementById('cryptoFields').style.display = 'none';
-        if (r.value === 'card')   document.getElementById('cardFields').style.display   = 'block';
-        if (r.value === 'crypto') document.getElementById('cryptoFields').style.display = 'block';
-    });
+const paymentRadios = document.querySelectorAll('.pm-radio');
+const cardFields = document.getElementById('cardFields');
+const cryptoFields = document.getElementById('cryptoFields');
+const payForm = document.getElementById('payForm');
+const payBtn = document.getElementById('payBtn');
+
+const togglePaymentFields = (value) => {
+    if (!cardFields || !cryptoFields) return;
+    cardFields.hidden = value !== 'card';
+    cryptoFields.hidden = value !== 'crypto';
+};
+
+paymentRadios.forEach((radio) => {
+    radio.addEventListener('change', () => togglePaymentFields(radio.value));
 });
 
-// Card number formatting
-document.getElementById('cardNum')?.addEventListener('input', e => {
-    let v = e.target.value.replace(/\D/g,'').slice(0,16);
-    e.target.value = v.match(/.{1,4}/g)?.join('  ') ?? v;
+payForm?.addEventListener('submit', () => {
+    payBtn.disabled = true;
+    payBtn.setAttribute('aria-busy', 'true');
+    payBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Processing...';
 });
 </script>
 @endpush
-@endsection

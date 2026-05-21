@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Approval Letter — {{ $serviceRequest->reference_number }}</title>
+    <title>Approval Letter - {{ $serviceRequest->reference_number }}</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:'DejaVu Sans', Arial, sans-serif; font-size:12px; color:#1a2332; background:#fff; }
@@ -33,7 +33,7 @@
         .conditions { margin:16px 0; }
         .conditions h4 { font-size:11px; font-weight:700; color:#374151; margin-bottom:8px; letter-spacing:.03em; text-transform:uppercase; }
         .condition-item { display:flex; gap:8px; margin-bottom:5px; font-size:11px; color:#374151; }
-        .condition-item::before { content:'•'; color:#0052cc; font-weight:700; flex-shrink:0; }
+        .condition-item::before { content:'*'; color:#0052cc; font-weight:700; flex-shrink:0; }
 
         .signature-block { margin-top:36px; display:flex; justify-content:space-between; }
         .sig-side { width:45%; }
@@ -53,7 +53,7 @@
     <div class="letterhead">
         <div>
             <div class="org-name">{{ $serviceRequest->office->name }}</div>
-            <div class="org-sub">{{ $serviceRequest->office->municipality->name }} — Government Services</div>
+            <div class="org-sub">{{ $serviceRequest->office->municipality->name }} - Government Services</div>
         </div>
         <div class="letter-date">
             Date: {{ now()->format('F d, Y') }}<br>
@@ -62,7 +62,7 @@
     </div>
 
     <div class="ref-line">
-        <strong>RE: Approval of Service Request — {{ $serviceRequest->service->name }}</strong>
+        <strong>RE: Approval of Service Request - {{ $serviceRequest->resolved_service_name }}</strong>
     </div>
 
     <div class="recipient">
@@ -73,14 +73,14 @@
     <p class="salutation">Dear {{ $serviceRequest->citizen->name }},</p>
 
     <p class="body-text">
-        We are pleased to inform you that your application for the <strong>{{ $serviceRequest->service->name }}</strong>
+        We are pleased to inform you that your application for the <strong>{{ $serviceRequest->resolved_service_name }}</strong>
         service submitted to {{ $serviceRequest->office->name }} has been reviewed and <strong style="color:#16a34a">officially approved</strong>.
     </p>
 
     <div class="approval-box">
-        <h3>✓ Approval Details</h3>
+        <h3>Approved Request Details</h3>
         <div class="approval-detail"><span class="lbl">Reference Number</span><span class="val">{{ $serviceRequest->reference_number }}</span></div>
-        <div class="approval-detail"><span class="lbl">Service</span><span class="val">{{ $serviceRequest->service->name }}</span></div>
+        <div class="approval-detail"><span class="lbl">Service</span><span class="val">{{ $serviceRequest->resolved_service_name }}</span></div>
         <div class="approval-detail"><span class="lbl">Approval Date</span><span class="val">{{ now()->format('F d, Y') }}</span></div>
         <div class="approval-detail"><span class="lbl">Issuing Office</span><span class="val">{{ $serviceRequest->office->name }}</span></div>
         <div class="approval-detail"><span class="lbl">Estimated Completion</span><span class="val">Within {{ $serviceRequest->service->estimated_duration_days }} business day(s)</span></div>
@@ -88,12 +88,12 @@
 
     <p class="body-text">
         Please ensure that all required fees are settled and any outstanding documents are submitted promptly.
-        You will be notified via email and through the E-Services platform once your documents are ready for collection or delivery.
+        You will be notified via email and through the CedarGov platform once your documents are ready for collection or delivery.
     </p>
 
     <div class="conditions">
         <h4>Next Steps</h4>
-        <div class="condition-item">Complete payment of the service fee (${{ number_format($serviceRequest->service->price, 2) }}) if not yet paid.</div>
+        <div class="condition-item">Complete payment of the service fee ({{ $serviceRequest->formatted_service_price }}) if not yet paid.</div>
         <div class="condition-item">You will receive a notification when your document is ready.</div>
         <div class="condition-item">Track your request anytime using reference: {{ $serviceRequest->reference_number }}</div>
     </div>
@@ -120,7 +120,7 @@
     </div>
 
     <div class="footer-bar">
-        <span>E-Services Government Platform &copy; {{ date('Y') }}</span>
+        <span>CedarGov Platform &copy; {{ date('Y') }}</span>
         <span>Generated: {{ now()->format('M d, Y H:i') }} | Ref: {{ $serviceRequest->reference_number }}</span>
     </div>
 

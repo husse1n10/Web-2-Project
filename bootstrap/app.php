@@ -12,16 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Trust Heroku's load balancer so HTTPS is detected correctly.
+        $middleware->trustProxies(at: '*');
+
+        // Exclude external webhooks from CSRF — they're authenticated via HMAC signature.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/*',
+        ]);
         // Redirect authenticated users away from guest-only pages to their dashboard.
         $middleware->redirectUsersTo(function (\Illuminate\Http\Request $request) {
             $user = $request->user();
 
             if (! $user) {
                 return route('home');
-            }
-
-            if ($user->role === 'citizen' && ! $user->hasCompletedCitizenProfile()) {
-                return route('citizen.profile');
             }
 
             return match ($user->role) {
@@ -35,11 +38,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'citizen.profile.complete' => \App\Http\Middleware\EnsureCitizenProfileComplete::class,
+            'citizen.identity.approved' => \App\Http\Middleware\EnsureCitizenIdentityApproved::class,
         ]);
 
         // Security headers on all web responses.
         $middleware->web(append: [
             \App\Http\Middleware\SecurityHeadersMiddleware::class,
+            \App\Http\Middleware\SetLocale::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

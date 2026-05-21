@@ -8,6 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Notifications\Messages\BroadcastMessage;
 
 class AppointmentReminder extends Notification implements ShouldQueue
 {
@@ -21,7 +22,7 @@ class AppointmentReminder extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = ['mail', 'database'];
+        $channels = ['mail', 'database', 'broadcast'];
 
         $smsSources = ['appointment_confirmed', 'daily_scheduler'];
         if (in_array($this->source, $smsSources, true) && filled($notifiable->phone ?? null)) {
@@ -33,25 +34,30 @@ class AppointmentReminder extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $appointment = $this->appointment;
-        $requestRef = $appointment->request?->reference_number;
+        $appt = $this->appointment;
+        $date = \Carbon\Carbon::parse($appt->appointment_date)->format('l, M d, Y');
+        $time = substr((string) $appt->appointment_time, 0, 5);
+        $status = ucfirst($appt->status);
+        $requestRef = $appt->request?->reference_number;
 
         $mail = (new MailMessage)
-            ->subject('Appointment Reminder')
-            ->greeting("Hello {$notifiable->name},")
-            ->line('This is a reminder regarding your appointment.')
-            ->line('Date: ' . $appointment->appointment_date)
-            ->line('Time: ' . substr((string) $appointment->appointment_time, 0, 5))
-            ->line('Status: ' . ucfirst($appointment->status));
+            ->subject("CedarGov — Appointment {$status} on {$date}")
+            ->greeting("Hello, {$notifiable->name}")
+            ->line("This is a reminder about your upcoming appointment:")
+            ->line("**Date:** {$date}")
+            ->line("**Time:** {$time}")
+            ->line("**Status:** {$status}");
 
         if ($requestRef) {
-            $mail->line('Request: ' . $requestRef)
-                ->action('View Request', route('citizen.requests.show', $appointment->service_request_id));
+            $mail->line("**Request:** {$requestRef}")
+                ->action('View My Request', route('citizen.requests.show', $appt->service_request_id));
         } else {
-            $mail->action('View Office', route('citizen.offices.show', $appointment->office_id));
+            $mail->action('View Office Details', route('citizen.offices.show', $appt->office_id));
         }
 
-        return $mail->line('Please arrive on time and bring required documents.');
+        return $mail
+            ->line('Please arrive on time and bring any required documents.')
+            ->salutation('— The CedarGov Team');
     }
 
     public function toArray(object $notifiable): array
@@ -67,6 +73,11 @@ class AppointmentReminder extends Notification implements ShouldQueue
         ];
     }
 
+    public function toBroadcast(object $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage($this->toArray($notifiable));
+    }
+
     public function toSms(object $notifiable): string
     {
         $date = (string) $this->appointment->appointment_date;
@@ -77,6 +88,6 @@ class AppointmentReminder extends Notification implements ShouldQueue
             ? route('citizen.requests.show', $this->appointment->service_request_id)
             : route('citizen.offices.show', $this->appointment->office_id);
 
-        return "E-Services: Appointment {$status} on {$date} at {$time}. {$link}";
+        return "CedarGov: Appointment {$status} on {$date} at {$time}. {$link}";
     }
 }

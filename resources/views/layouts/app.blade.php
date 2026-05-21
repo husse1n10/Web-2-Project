@@ -1,527 +1,2495 @@
 <!DOCTYPE html>
-<html lang="en">
+@php
+    $locale = app()->getLocale();
+    $isRtl  = $locale === 'ar';
+@endphp
+<html lang="{{ $locale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0B1120">
-    <title>@yield('title', 'E-Services') — Government Portal</title>
+    <title>@yield('title', 'Dashboard') | {{ config('variables.templateName', 'CedarGov') }}</title>
+    <link rel="icon" type="image/png" href="{{ asset('assets/img/brand/cedar-logo-icon-trim.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('assets/img/brand/cedar-logo-icon-trim.png') }}">
+
+    {{-- Fonts --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    {{-- Bootstrap 5 --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    {{-- Bootstrap Icons --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    {{-- Design System --}}
+    <link href="{{ asset('css/app.css') }}?v={{ @filemtime(public_path('css/app.css')) ?: time() }}" rel="stylesheet">
+
     <style>
-    :root {
-        --primary:#1B4FD8;--primary-dk:#1740B8;--primary-lt:#EEF3FF;--primary-light:#EEF3FF;
-        --brand:#1B4FD8;--brand-dk:#1740B8;--brand-lt:#EEF3FF;--brand-glow:rgba(27,79,216,.18);
-        --blue-50:#EFF6FF;--blue-100:#DBEAFE;--blue-200:#BFDBFE;
-        --emerald:#059669;--emerald-lt:#ECFDF5;--emerald-bg:#ECFDF5;
-        --amber:#D97706;--amber-lt:#FFFBEB;--amber-bg:#FFFBEB;
-        --rose:#DC2626;--rose-lt:#FEF2F2;--rose-bg:#FEF2F2;
-        --violet:#7C3AED;--violet-lt:#F5F3FF;--violet-bg:#F5F3FF;
-        --sky:#0284C7;--sky-bg:#F0F9FF;
-        --cyan-lt:#ECFEFF;--green:#16A34A;--green-lt:#F0FDF4;
-        --gold:#D97706;--gold-100:#FEF3C7;--gold-600:#D97706;
-        --navy-50:#EFF6FF;
-        --ink-900:#0F172A;--ink-800:#1E293B;--ink-600:#475569;--ink-500:#64748B;
-        --ink-400:#94A3B8;--ink-300:#CBD5E1;--ink-200:#E2E8F0;--ink-100:#F1F5F9;--ink-50:#F8FAFC;
-        --white:#FFFFFF;--slate:#475569;
-        --tx-900:#0F172A;--tx-700:#334155;--tx-600:#475569;--tx-500:#64748B;--tx-400:#94A3B8;--tx-300:#CBD5E1;
-        --sb-bg:#0B1120;--sb-border:rgba(255,255,255,.055);--sb-text:rgba(255,255,255,.5);
-        --sb-hi:#FFFFFF;--sb-hover:rgba(255,255,255,.06);--sb-active-bg:rgba(27,79,216,.75);--sb-w:252px;
-        --page-bg:#EEF2F7;--surface:#FFFFFF;--surface-2:#F7F9FC;--border:#E2E8F0;--border-lt:#F1F5F9;
-        --shadow-sm:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
-        --shadow-md:0 4px 8px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.05);
-        --shadow-lg:0 12px 28px rgba(0,0,0,.1),0 4px 8px rgba(0,0,0,.06);
-        --sh-xs:0 1px 2px rgba(0,0,0,.04);--sh-sm:0 1px 3px rgba(0,0,0,.07);
-        --sh-md:0 4px 8px rgba(0,0,0,.07);--sh-lg:0 12px 28px rgba(0,0,0,.1);
-        --sh-xl:0 24px 56px rgba(0,0,0,.14),0 8px 16px rgba(0,0,0,.08);
-        --top-h:56px;--r:12px;--r-sm:8px;--r-xs:6px;--radius:12px;--radius-sm:8px;
-        --font:'Outfit',system-ui,sans-serif;--font-disp:'Outfit',system-ui,sans-serif;
-        --font-mono:'IBM Plex Mono',monospace;--mono:'IBM Plex Mono',monospace;
-        --ease:cubic-bezier(.4,0,.2,1);--spring:cubic-bezier(.34,1.4,.64,1);
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{font-size:14px;scroll-behavior:smooth}
-    body{font-family:var(--font);background:var(--page-bg);color:var(--ink-600);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+        /* Role-aware dashboard theming */
+        body {
+            background: var(--es-bg);
+        }
 
-    /* Sidebar */
-    .sidebar{position:fixed;inset:0 auto 0 0;width:var(--sb-w);background:var(--sb-bg);z-index:1050;display:flex;flex-direction:column;border-right:1px solid var(--sb-border);transition:transform .28s var(--ease)}
-    .sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:200px;background:radial-gradient(ellipse 130% 110% at 50% -10%,rgba(27,79,216,.25) 0%,transparent 70%);pointer-events:none}
-    .sb-brand{display:flex;align-items:center;gap:.7rem;padding:1rem .9rem .9rem;border-bottom:1px solid var(--sb-border);flex-shrink:0;position:relative;z-index:1;text-decoration:none}
-    .sb-mark{width:36px;height:36px;border-radius:9px;flex-shrink:0;background:linear-gradient(140deg,var(--primary) 0%,#5B8EFF 100%);display:flex;align-items:center;justify-content:center;font-size:.95rem;color:#fff;box-shadow:0 3px 10px rgba(27,79,216,.5)}
-    .sb-name{color:var(--sb-hi);font-size:.87rem;font-weight:700;line-height:1.2;letter-spacing:-.01em}
-    .sb-sub{color:rgba(255,255,255,.25);font-size:.63rem;letter-spacing:.06em;text-transform:uppercase}
-    .sb-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:.5rem .6rem}
-    .sb-scroll::-webkit-scrollbar{width:3px}
-    .sb-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:3px}
-    .sb-section{color:rgba(255,255,255,.18);font-size:.61rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:.7rem .5rem .2rem;user-select:none}
-    .sidebar .nav-link{display:flex;align-items:center;gap:.55rem;color:var(--sb-text);padding:.5rem .65rem;border-radius:var(--r-sm);font-size:.83rem;font-weight:500;text-decoration:none;margin-bottom:1px;transition:background .15s,color .15s;position:relative;white-space:nowrap}
-    .sidebar .nav-link .ni{font-size:.95rem;width:18px;text-align:center;flex-shrink:0;transition:transform .2s var(--spring)}
-    .sidebar .nav-link:hover{background:var(--sb-hover);color:var(--sb-hi)}
-    .sidebar .nav-link:hover .ni{transform:scale(1.18)}
-    .sidebar .nav-link.active{background:var(--sb-active-bg);color:#fff;box-shadow:0 2px 10px rgba(27,79,216,.4)}
-    .sidebar .nav-link.active::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;background:#7BA8FF;border-radius:0 3px 3px 0}
-    .nb{margin-left:auto;font-size:.6rem;font-weight:700;padding:.1rem .38rem;border-radius:99px;flex-shrink:0;background:var(--rose);color:#fff;line-height:1.4}
-    .sb-footer{border-top:1px solid var(--sb-border);padding:.7rem .6rem .9rem;flex-shrink:0}
-    .sb-user{display:flex;align-items:center;gap:.6rem;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);border-radius:var(--r-sm);padding:.55rem .7rem}
-    .sb-av{width:30px;height:30px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--primary),#60A5FA);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;border:2px solid rgba(255,255,255,.12)}
-    .sb-un{color:rgba(255,255,255,.85);font-size:.78rem;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .sb-ur{color:rgba(255,255,255,.25);font-size:.63rem}
-    .sb-logout{width:28px;height:28px;flex-shrink:0;border-radius:var(--r-xs);background:transparent;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.82rem;transition:all .15s}
-    .sb-logout:hover{background:rgba(220,38,38,.18);color:#FCA5A5;border-color:rgba(220,38,38,.35)}
+        body.es-role-admin {
+            --es-bg: #F3F6FB;
+            --es-surface: #FFFFFF;
+            --es-border: #D9E1EC;
+            --es-border-soft: #E7EDF5;
+            --es-input-border: #94A3B8;
+            --es-text: #0F172A;
+            --es-muted: #64748B;
+            --es-subtle: #94A3B8;
+            --es-primary: #2563EB;
+            --es-primary-dk: #1D4ED8;
+            --es-primary-s: #DBEAFE;
+            --es-primary-m: #BFDBFE;
+            --es-sky: #2563EB;
+            --es-sky-s: #DBEAFE;
+            --es-amber: #D97706;
+            --es-amber-s: #FFEDD5;
+            --es-emerald: #059669;
+            --es-emerald-s: #D1FAE5;
+            --es-rose: #E11D48;
+            --es-rose-s: #FFE4E6;
+            --shadow-card: 0 8px 22px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+            --brand-mark-bg: #0F172A;
+            font-family: 'Public Sans', 'Inter', system-ui, -apple-system, sans-serif;
+        }
 
-    /* Overlay */
-    .sb-overlay{display:none;position:fixed;inset:0;background:rgba(11,17,32,.65);z-index:1040;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-    .sb-overlay.show{display:block;animation:fadeIn .2s var(--ease)}
-    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        body.es-role-citizen {
+            --es-bg: #F4F8FF;
+            --es-surface: #FFFFFF;
+            --es-border: #D7E5F6;
+            --es-border-soft: #E8F0FA;
+            --es-input-border: #93B4D8;
+            --es-text: #0F172A;
+            --es-muted: #64748B;
+            --es-subtle: #94A3B8;
+            --es-primary: #0EA5E9;
+            --es-primary-dk: #0284C7;
+            --es-primary-s: #E0F2FE;
+            --es-primary-m: #BAE6FD;
+            --es-sky: #0EA5E9;
+            --es-sky-s: #E0F2FE;
+            --es-amber: #D97706;
+            --es-amber-s: #FFEDD5;
+            --es-emerald: #059669;
+            --es-emerald-s: #D1FAE5;
+            --es-rose: #E11D48;
+            --es-rose-s: #FFE4E6;
+            --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.06), 0 3px 10px rgba(15, 23, 42, 0.04);
+            --brand-mark-bg: linear-gradient(145deg, #0EA5E9 0%, #2563EB 100%);
+            font-family: 'Inter', 'Public Sans', system-ui, -apple-system, sans-serif;
+        }
 
-    /* Topbar */
-    .topbar{position:fixed;top:0;left:var(--sb-w);right:0;height:var(--top-h);z-index:1000;background:rgba(238,242,247,.92);backdrop-filter:saturate(200%) blur(20px);-webkit-backdrop-filter:saturate(200%) blur(20px);border-bottom:1px solid rgba(0,0,0,.07);display:flex;align-items:center;gap:.65rem;padding:0 1.25rem;transition:left .28s var(--ease)}
-    .menu-btn{display:none;width:34px;height:34px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;align-items:center;justify-content:center;font-size:1.05rem;color:var(--ink-500);transition:all .15s;flex-shrink:0}
-    .menu-btn:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary)}
-    .top-title{flex:1;font-size:.9rem;font-weight:700;color:var(--ink-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
-    .top-right{display:flex;align-items:center;gap:.4rem;flex-shrink:0}
-    .top-btn{width:34px;height:34px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--ink-500);cursor:pointer;font-size:.9rem;position:relative;transition:all .15s}
-    .top-btn:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--blue-200)}
-    .top-dot{position:absolute;top:-3px;right:-3px;width:15px;height:15px;border-radius:50%;background:var(--rose);color:#fff;font-size:.55rem;display:flex;align-items:center;justify-content:center;border:2px solid var(--page-bg);font-weight:800}
-    .top-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#60A5FA);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;cursor:pointer;flex-shrink:0;border:2px solid var(--surface);box-shadow:0 0 0 2px var(--primary-lt);transition:box-shadow .15s}
-    .top-av:hover{box-shadow:0 0 0 3px var(--blue-200)}
+        body.es-role-office_user {
+            --es-bg: #F6F8FC;
+            --es-surface: #FFFFFF;
+            --es-border: #D8E1EF;
+            --es-border-soft: #E9EEF7;
+            --es-input-border: #94A3B8;
+            --es-text: #0F172A;
+            --es-muted: #64748B;
+            --es-subtle: #94A3B8;
+            --es-primary: #2563EB;
+            --es-primary-dk: #1D4ED8;
+            --es-primary-s: #DBEAFE;
+            --es-primary-m: #BFDBFE;
+            --es-sky: #0EA5E9;
+            --es-sky-s: #E0F2FE;
+            --es-amber: #D97706;
+            --es-amber-s: #FFEDD5;
+            --es-emerald: #059669;
+            --es-emerald-s: #D1FAE5;
+            --es-rose: #E11D48;
+            --es-rose-s: #FFE4E6;
+            --shadow-card: 0 10px 26px rgba(15, 23, 42, 0.07), 0 2px 8px rgba(15, 23, 42, 0.04);
+            --brand-mark-bg: linear-gradient(145deg, #1D4ED8 0%, #0EA5E9 100%);
+            font-family: 'Inter', 'Public Sans', system-ui, -apple-system, sans-serif;
+        }
 
-    /* Layout */
-    .main-wrap{margin-left:var(--sb-w);padding-top:var(--top-h);min-height:100vh;transition:margin-left .28s var(--ease)}
-    .main-pad{padding:1.35rem}
-    .page-header,.pg-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem}
-    .pg-header h1{font-size:1.2rem;font-weight:800;color:var(--ink-900);letter-spacing:-.02em;margin:0}
+        body.es-role-guest {
+            --brand-mark-bg: #1A1714;
+        }
 
-    /* Hero banners */
-    .hero-banner,.hero-band{background:linear-gradient(125deg,#0B1120 0%,#0D1E55 50%,#0A1A56 100%);border-radius:var(--r);padding:1.35rem 1.5rem;position:relative;overflow:hidden}
-    .hero-banner::before,.hero-band::before{content:'';position:absolute;top:-50px;right:-30px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(27,79,216,.22) 0%,transparent 70%);pointer-events:none}
-    .hero-banner::after,.hero-band::after{content:'';position:absolute;bottom:-30px;left:20%;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(6,148,162,.12) 0%,transparent 70%);pointer-events:none}
+        /* ── RTL adjustments (Arabic) ─────────────────────────────── */
+        html[dir="rtl"] body {
+            font-family: 'Segoe UI', 'Tajawal', 'Cairo', 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        html[dir="rtl"] .es-sidebar {
+            right: 0;
+            left: auto;
+            border-right: none;
+            border-left: 1px solid var(--es-border);
+        }
+        html[dir="rtl"] .es-main {
+            margin-right: 260px;
+            margin-left: 0;
+        }
+        @media (max-width: 991.98px) {
+            html[dir="rtl"] .es-main { margin-right: 0; }
+        }
+        html[dir="rtl"] .es-nav-link i {
+            margin-left: .65rem;
+            margin-right: 0;
+        }
+        html[dir="rtl"] .me-1, html[dir="rtl"] .me-2, html[dir="rtl"] .me-3 {
+            margin-right: 0 !important;
+        }
+        html[dir="rtl"] .me-1 { margin-left: .25rem !important; }
+        html[dir="rtl"] .me-2 { margin-left: .5rem !important; }
+        html[dir="rtl"] .me-3 { margin-left: 1rem !important; }
+        html[dir="rtl"] .ms-1, html[dir="rtl"] .ms-2 {
+            margin-left: 0 !important;
+        }
+        html[dir="rtl"] .ms-1 { margin-right: .25rem !important; }
+        html[dir="rtl"] .ms-2 { margin-right: .5rem !important; }
+        html[dir="rtl"] .dropdown-menu-end {
+            --bs-position: start;
+        }
+        html[dir="rtl"] .breadcrumb-item + .breadcrumb-item::before {
+            float: right;
+            padding-left: .5rem;
+            padding-right: 0;
+        }
 
-    /* Cards */
-    .card{background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:var(--r)!important;box-shadow:var(--sh-sm)}
-    .card-header{background:var(--surface)!important;border-bottom:1px solid var(--border-lt)!important;padding:.85rem 1.2rem!important;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
-    .card-title{font-size:.87rem;font-weight:700;color:var(--ink-900);margin:0;letter-spacing:-.01em}
-    .card-body{padding:1.2rem!important}
-    .card-body.p0{padding:0!important}
+        .es-sidebar {
+            background: var(--es-surface);
+            border-right: 1px solid var(--es-border);
+        }
 
-    /* Stat cards */
-    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem;box-shadow:var(--sh-sm);position:relative;overflow:hidden;transition:transform .22s var(--spring),box-shadow .22s}
-    .stat-card::after{content:'';position:absolute;bottom:-18px;right:-18px;width:85px;height:85px;border-radius:50%;background:var(--sc-accent,var(--primary-lt));opacity:.5;transition:transform .3s var(--ease);pointer-events:none}
-    .stat-card:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
-    .stat-card:hover::after{transform:scale(1.35)}
-    .stat-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
-    .stat-val{font-size:1.65rem;font-weight:800;letter-spacing:-.04em;line-height:1;margin-top:.65rem;color:var(--ink-900)}
-    .stat-lbl{font-size:.72rem;color:var(--ink-400);font-weight:500;margin-top:.18rem}
-    .stat-delta{display:inline-flex;align-items:center;gap:.15rem;font-size:.67rem;font-weight:700;padding:.15rem .45rem;border-radius:99px}
-    .stat-delta.up,.chip-up{background:var(--emerald-lt);color:#065F46}
-    .stat-delta.dn,.chip-dn{background:var(--rose-lt);color:#991B1B}
-    .chip-neu{background:var(--ink-100);color:var(--ink-500)}
+        .es-sidebar-brand {
+            border-bottom: 1px solid var(--es-border);
+        }
 
-    /* Status badges */
-    .sbadge{display:inline-flex;align-items:center;gap:.25rem;padding:.22rem .62rem;border-radius:99px;font-size:.68rem;font-weight:700;white-space:nowrap;letter-spacing:.01em}
-    .sbadge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
-    .s-pending{background:var(--amber-lt);color:#92400E}
-    .s-in_review{background:var(--sky-bg);color:#0369A1}
-    .s-missing_documents{background:var(--rose-lt);color:#991B1B}
-    .s-approved{background:var(--emerald-lt);color:#065F46}
-    .s-rejected{background:var(--rose-lt);color:#991B1B}
-    .s-completed{background:var(--emerald-lt);color:#065F46}
-    .s-paid{background:var(--emerald-lt);color:#065F46}
-    .s-unpaid{background:var(--rose-lt);color:#991B1B}
-    .s-scheduled{background:var(--sky-bg);color:#0369A1}
-    .s-confirmed{background:var(--emerald-lt);color:#065F46}
-    .s-cancelled{background:var(--rose-lt);color:#991B1B}
-    .s-active{background:var(--emerald-lt);color:#065F46}
-    .s-inactive,.s-false{background:var(--ink-100);color:var(--ink-500)}
-    .s-true{background:var(--emerald-lt);color:#065F46}
-    .s-neutral{background:var(--ink-100);color:var(--ink-600)}
+        .es-brand-mark {
+            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            overflow: hidden;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+            flex-shrink: 0;
+        }
 
-    /* Tables */
-    .table-wrap,.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-    .table{font-size:.82rem;margin:0}
-    .table thead th{font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-400);background:var(--surface-2);border-bottom:1px solid var(--border-lt);padding:.72rem 1.1rem;white-space:nowrap}
-    .table tbody td{padding:.82rem 1.1rem;vertical-align:middle;border-color:var(--border-lt);font-size:.82rem}
-    .table tbody tr{transition:background .1s}
-    .table tbody tr:hover td{background:var(--surface-2)}
-    .table tbody tr:last-child td{border-bottom:none}
+        .es-brand-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
 
-    /* Forms */
-    .form-control,.form-select{border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:.83rem;padding:.55rem .9rem;font-family:var(--font);background:var(--surface);color:var(--ink-900);transition:border-color .15s,box-shadow .15s;min-height:38px}
-    .form-control:focus,.form-select:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(27,79,216,.1)}
-    .form-control::placeholder{color:var(--ink-300)}
-    .form-label{font-size:.76rem;font-weight:600;color:var(--ink-600);margin-bottom:.35rem;display:block}
-    .form-text{font-size:.7rem;color:var(--ink-400);margin-top:.25rem;display:block}
-    .input-icon-wrap{position:relative}
-    .input-icon-wrap .ii,.input-icon-wrap .field-icon{position:absolute;left:.82rem;top:50%;transform:translateY(-50%);color:var(--ink-400);font-size:.9rem;pointer-events:none}
-    .input-icon-wrap .form-control{padding-left:2.45rem}
-    .toggle-pw{position:absolute;right:.82rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink-400);cursor:pointer;font-size:.9rem;padding:0}
-    .toggle-pw:hover{color:var(--primary)}
+        .es-brand-name {
+            font-size: 0.875rem;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
 
-    /* Buttons */
-    .btn{border-radius:var(--r-sm);font-size:.82rem;font-weight:600;font-family:var(--font);padding:.5rem 1rem;transition:all .18s;display:inline-flex;align-items:center;gap:.38rem;letter-spacing:-.01em;min-height:36px;white-space:nowrap}
-    .btn-primary{background:var(--primary);border-color:var(--primary);color:#fff!important}
-    .btn-primary:hover{background:var(--primary-dk);border-color:var(--primary-dk);color:#fff!important;box-shadow:0 4px 12px rgba(27,79,216,.35);transform:translateY(-1px)}
-    .btn-primary:active{transform:none;box-shadow:none}
-    .btn-outline-primary{background:transparent;border:1.5px solid var(--primary);color:var(--primary)}
-    .btn-outline-primary:hover{background:var(--primary-lt)}
-    .btn-ghost,.btn-light{background:var(--ink-50);border:1.5px solid var(--border);color:var(--ink-600)}
-    .btn-ghost:hover,.btn-light:hover{background:var(--ink-100);color:var(--ink-900)}
-    .btn-danger{background:var(--rose);border-color:var(--rose);color:#fff!important}
-    .btn-danger:hover{background:#B91C1C;color:#fff!important;box-shadow:0 4px 12px rgba(220,38,38,.3)}
-    .btn-success{background:var(--emerald);border-color:var(--emerald);color:#fff!important}
-    .btn-success:hover{background:#047857;color:#fff!important}
-    .btn-sm{padding:.32rem .72rem;font-size:.75rem;min-height:30px;gap:.28rem}
-    .btn-lg{padding:.65rem 1.4rem;font-size:.88rem;min-height:42px}
-    .btn-icon{width:32px;height:32px;padding:0;justify-content:center}
-    .btn-block{width:100%;justify-content:center}
+        .es-brand-sub {
+            font-size: 0.6rem;
+            letter-spacing: 0.01em;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
 
-    /* Alerts */
-    .alert{border-radius:var(--r-sm);border:none!important;font-size:.82rem;padding:.7rem .95rem;display:flex;align-items:flex-start;gap:.55rem}
-    .alert-success{background:var(--emerald-lt);color:#065F46}
-    .alert-danger{background:var(--rose-lt);color:#991B1B}
-    .alert-warning{background:var(--amber-lt);color:#92400E}
-    .alert-info{background:var(--sky-bg);color:#0369A1}
-    .alert .btn-close{margin-left:auto;opacity:.45}
+        /* Nav links */
+        .es-nav-link {
+            color: var(--es-muted);
+            border-radius: 7px;
+            margin: 0.0625rem 0.625rem;
+            font-size: 0.875rem;
+        }
+        .es-nav-link:hover {
+            background: var(--es-bg);
+            color: var(--es-text);
+        }
+        .es-nav-link.active {
+            background: var(--es-primary-s);
+            color: var(--es-primary);
+        }
 
-    /* Dropdowns */
-    .dropdown-menu{border-radius:var(--r-sm);border:1px solid var(--border-lt);box-shadow:var(--sh-lg);font-size:.82rem;padding:.3rem}
-    .dropdown-item{border-radius:var(--r-xs);padding:.45rem .8rem;color:var(--ink-600);font-size:.82rem;transition:background .1s}
-    .dropdown-item:hover{background:var(--surface-2);color:var(--ink-900)}
-    .dropdown-item.text-danger:hover{background:var(--rose-lt);color:var(--rose)}
-    .dropdown-header{padding:.5rem .8rem .2rem;font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-400)}
-    .dropdown-divider{margin:.25rem;border-color:var(--border-lt)}
+        /* Topbar */
+        .es-topbar {
+            background: var(--es-surface);
+            background: color-mix(in srgb, var(--es-surface) 88%, transparent);
+            border-bottom: 1px solid var(--es-border);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
 
-    /* Modals */
-    .modal-content{border:none!important;border-radius:var(--r)!important;box-shadow:var(--sh-xl)}
-    .modal-header{border-bottom:1px solid var(--border-lt)!important;padding:1.1rem 1.3rem .7rem!important}
-    .modal-title{font-weight:700;font-size:.97rem}
-    .modal-body{padding:.95rem 1.3rem!important}
-    .modal-footer{border-top:1px solid var(--border-lt)!important;padding:.7rem 1.3rem 1.1rem!important;gap:.4rem}
+        .es-content { background: var(--es-bg); }
 
-    /* Code */
-    code{font-family:var(--font-mono);font-size:.75em;background:var(--primary-lt);color:var(--primary);padding:.14em .45em;border-radius:var(--r-xs);font-weight:500}
+        .card {
+            border-color: var(--es-border);
+            box-shadow: var(--shadow-card);
+        }
 
-    /* Info rows */
-    .info-row,.ir{display:flex;justify-content:space-between;align-items:center;padding:.55rem 0;border-bottom:1px solid var(--border-lt);font-size:.82rem}
-    .info-row:last-child,.ir:last-child{border-bottom:none}
-    .ir-label,.ir-l{color:var(--ink-400);font-weight:500}
-    .ir-value,.ir-v{font-weight:600;color:var(--ink-900);text-align:right}
+        .card-header {
+            border-bottom-color: var(--es-border-soft);
+        }
 
-    /* Progress */
-    .progress-wrap,.prog-wrap{height:5px;background:var(--border-lt);border-radius:99px;overflow:hidden}
-    .progress-bar-inner,.prog-bar{height:100%;border-radius:99px;background:var(--primary);transition:width .5s var(--ease)}
+        .table th {
+            background: var(--es-bg);
+            border-bottom-color: var(--es-border);
+            color: var(--es-subtle);
+        }
+        .table td {
+            border-bottom-color: var(--es-border-soft);
+            color: var(--es-text);
+        }
+        .table-hover tbody tr:hover > td {
+            background: var(--es-bg);
+        }
 
-    /* Empty state */
-    .empty-state,.empty{text-align:center;padding:3rem 1.5rem}
-    .empty-icon,.empty-ic{width:64px;height:64px;border-radius:50%;margin:0 auto .85rem;background:var(--ink-50);border:2px solid var(--border-lt);display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:var(--ink-300)}
-    .empty-state h4,.empty h4{font-size:.9rem;font-weight:700;color:var(--ink-600);margin-bottom:.25rem}
-    .empty-state p,.empty p{font-size:.78rem;color:var(--ink-400);margin-bottom:.85rem}
+        .es-footer {
+            border-top-color: var(--es-border);
+            background: var(--es-surface);
+        }
 
-    /* Toasts */
-    .toast-stack{position:fixed;bottom:1.1rem;right:1.1rem;z-index:9999;display:flex;flex-direction:column;gap:.45rem}
-    .toast-item{min-width:270px;max-width:370px;background:#0F172A;color:#fff;border-radius:var(--r-sm);padding:.8rem 1rem;display:flex;align-items:center;gap:.6rem;box-shadow:var(--sh-xl);font-size:.82rem;line-height:1.45;animation:tIn .35s var(--spring)}
-    .toast-item.success{border-left:3px solid var(--emerald)}
-    .toast-item.error{border-left:3px solid var(--rose)}
-    .toast-item.info{border-left:3px solid var(--primary)}
-    .toast-item.out{animation:tOut .25s var(--ease) forwards}
-    @keyframes tIn{from{opacity:0;transform:translateX(100%) scale(.95)}to{opacity:1;transform:none}}
-    @keyframes tOut{to{opacity:0;transform:translateX(100%) scale(.95)}}
+        .btn-primary {
+            background: var(--es-primary);
+            border-color: var(--es-primary);
+        }
+        .btn-primary:hover {
+            background: var(--es-primary-dk);
+            border-color: var(--es-primary-dk);
+        }
 
-    /* Chat (support both .msg and .chat-msg class variants) */
-    .chat-box{max-height:320px;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.65rem;background:var(--ink-50)}
-    .msg,.chat-msg{display:flex;align-items:flex-end;gap:.45rem}
-    .msg.mine,.chat-msg.me{flex-direction:row-reverse}
-    .msg-av,.chat-av{width:26px;height:26px;border-radius:50%;background:var(--slate);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:700;flex-shrink:0}
-    .av-me,.chat-av.mine{background:linear-gradient(135deg,var(--primary),#60A5FA)}
-    .av-other{background:var(--ink-400)}
-    .msg-bubble,.chat-bub{max-width:74%}
-    .msg-bubble p,.chat-bub p{font-size:.82rem;margin:0;padding:.52rem .8rem;border-radius:14px;line-height:1.45}
-    .msg.mine .msg-bubble p,.chat-msg.me .chat-bub p{background:var(--primary);color:#fff;border-radius:14px 14px 4px 14px}
-    .msg:not(.mine) .msg-bubble p,.chat-msg:not(.me) .chat-bub p{background:var(--surface);color:var(--ink-600);border:1px solid var(--border);border-radius:14px 14px 14px 4px}
-    .msg-time,.chat-ts{font-size:.6rem;color:var(--ink-400);margin-top:2px}
-    .msg.mine .msg-time,.chat-msg.me .chat-ts{text-align:right}
+        .breadcrumb {
+            background: transparent;
+        }
 
-    /* Bottom nav */
-    .bnav{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:saturate(200%) blur(18px);-webkit-backdrop-filter:saturate(200%) blur(18px);border-top:1px solid var(--border);z-index:1030;padding:.28rem 0 calc(.28rem + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,.05)}
-    .bnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink-400);text-decoration:none;font-size:.58rem;font-weight:600;padding:.2rem .15rem;transition:color .12s;position:relative}
-    .bnav a i{font-size:1.1rem}
-    .bnav a.active{color:var(--primary)}
-    .bnav a.active::before{content:'';position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:24px;height:3px;background:var(--primary);border-radius:0 0 3px 3px}
-    .bnav .bn-dot{position:absolute;top:0;right:calc(50% - 18px);width:7px;height:7px;border-radius:50%;background:var(--rose);border:1.5px solid var(--page-bg)}
+        .es-empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+        }
 
-    /* Scrollbar */
-    ::-webkit-scrollbar{width:5px;height:5px}
-    ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:var(--ink-300);border-radius:99px}
-    ::-webkit-scrollbar-thumb:hover{background:var(--ink-400)}
+        .es-empty-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: .85rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: .6rem;
+            background: var(--es-primary-s);
+            color: var(--es-primary);
+            border: 1px solid var(--es-primary-m);
+            font-size: 1.1rem;
+        }
 
-    /* Pagination */
-    .pagination{gap:.2rem}
-    .page-item .page-link{border-radius:var(--r-xs)!important;border:1.5px solid var(--border);color:var(--ink-500);font-size:.77rem;padding:.38rem .65rem;transition:all .12s}
-    .page-item.active .page-link{background:var(--primary);border-color:var(--primary);color:#fff}
-    .page-item .page-link:hover{background:var(--primary-lt);border-color:var(--primary);color:var(--primary)}
+        .es-empty-title {
+            font-size: .88rem;
+            font-weight: 700;
+            color: var(--es-text);
+            margin-bottom: .2rem;
+        }
 
-    /* Misc */
-    .hide-mobile,.hide-sm{}
-    .font-mono{font-family:var(--font-mono)}
+        .es-empty-copy {
+            font-size: .8rem;
+            color: var(--es-muted);
+            margin-bottom: .85rem;
+        }
 
-    /* Responsive */
-    @media(max-width:991.98px){
-        .sidebar{transform:translateX(-100%)}
-        .sidebar.open{transform:translateX(0);box-shadow:var(--sh-xl)}
-        .topbar{left:0}
-        .menu-btn{display:flex}
-        .main-wrap{margin-left:0}
-        .bnav{display:flex}
-        .main-pad{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
-        .toast-stack{bottom:calc(66px + env(safe-area-inset-bottom))}
-    }
-    @media(max-width:767px){
-        .main-pad{padding:.9rem}
-        .hide-mobile,.hide-sm{display:none!important}
-    }
-    @media(max-width:575px){
-        .main-pad{padding:.75rem}
-        .topbar{padding:0 .85rem}
-    }
+        .es-empty-action {
+            min-width: 7.4rem;
+        }
+
+        /* Sneat-style admin refinements (admin only) */
+        body.es-role-admin .es-wrapper {
+            letter-spacing: 0.01px;
+        }
+
+        body.es-role-admin .es-sidebar {
+            box-shadow: 1px 0 0 rgba(15, 23, 42, 0.03);
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           CITIZEN PORTAL — PREMIUM DESIGN SYSTEM
+           Glass-morphism · Dark sidebar · Animated backgrounds
+           ═══════════════════════════════════════════════════════ */
+
+        body.es-role-citizen .es-wrapper {
+            letter-spacing: .01px;
+        }
+
+        /* ── Animated mesh background ── */
+        body.es-role-citizen .es-content {
+            position: relative;
+            background:
+                radial-gradient(ellipse at 15% -5%, rgba(56,189,248,0.18) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 110%, rgba(99,102,241,0.12) 0%, transparent 55%),
+                radial-gradient(ellipse at 50% 50%, rgba(16,185,129,0.05) 0%, transparent 65%),
+                var(--es-bg);
+            overflow: hidden;
+        }
+
+        body.es-role-citizen .es-content::before,
+        body.es-role-citizen .es-content::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(80px);
+        }
+
+        body.es-role-citizen .es-content::before {
+            width: 500px;
+            height: 500px;
+            top: -120px;
+            right: -80px;
+            background: radial-gradient(circle, rgba(14,165,233,0.12) 0%, rgba(99,102,241,0.06) 50%, transparent 70%);
+            animation: citizenOrbitA 25s ease-in-out infinite;
+        }
+
+        body.es-role-citizen .es-content::after {
+            width: 400px;
+            height: 400px;
+            bottom: -100px;
+            left: -60px;
+            background: radial-gradient(circle, rgba(16,185,129,0.1) 0%, rgba(14,165,233,0.05) 50%, transparent 70%);
+            animation: citizenOrbitB 30s ease-in-out infinite;
+        }
+
+        body.es-role-citizen .es-content > *:not(.modal):not(.modal-backdrop) {
+            position: relative;
+            z-index: 1;
+        }
+
+        body.es-role-citizen .es-content > .modal {
+            z-index: 1060;
+        }
+
+        @keyframes citizenOrbitA {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(-40px, 60px) scale(1.1); }
+            66% { transform: translate(30px, -30px) scale(0.95); }
+        }
+
+        @keyframes citizenOrbitB {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, -40px) scale(1.08); }
+        }
+
+        /* ── Dark glass sidebar ── */
+        body.es-role-citizen .es-sidebar {
+            background: linear-gradient(180deg, #0B1120 0%, #111B2E 50%, #0F1729 100%);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3), 1px 0 0 rgba(255,255,255,0.04);
+        }
+
+        body.es-role-citizen .es-sidebar-brand {
+            border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+        }
+
+        body.es-role-citizen .es-brand-name {
+            color: #F1F5F9 !important;
+        }
+
+        body.es-role-citizen .es-brand-sub {
+            color: #64748B !important;
+        }
+
+        body.es-role-citizen .es-nav-section {
+            color: rgba(148,163,184,0.6);
+            letter-spacing: .1em;
+            font-size: .62rem;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        body.es-role-citizen .es-nav-link {
+            margin: .15rem .65rem;
+            border: 1px solid transparent;
+            border-radius: .6rem;
+            padding: .58rem .9rem;
+            font-weight: 500;
+            color: #94A3B8;
+            transition: all .22s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-citizen .es-nav-link i {
+            color: #64748B;
+            transition: color .22s ease;
+        }
+
+        body.es-role-citizen .es-nav-link:hover {
+            transform: translateX(3px);
+            color: #E2E8F0;
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        body.es-role-citizen .es-nav-link:hover i {
+            color: #38BDF8;
+        }
+
+        body.es-role-citizen .es-nav-link.active {
+            color: #FFFFFF;
+            border-color: rgba(56,189,248,0.25);
+            background: linear-gradient(135deg, rgba(14,165,233,0.2) 0%, rgba(99,102,241,0.15) 100%);
+            box-shadow: 0 8px 24px rgba(14,165,233,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+
+        body.es-role-citizen .es-nav-link.active i {
+            color: #38BDF8;
+        }
+
+        body.es-role-citizen .es-nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, #38BDF8, #818CF8);
+            box-shadow: 0 0 12px rgba(56,189,248,0.5);
+        }
+
+        body.es-role-citizen .es-nav-badge {
+            background: linear-gradient(135deg, #0EA5E9, #6366F1) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(14,165,233,0.4);
+        }
+
+        body.es-role-citizen .es-sidebar .es-nav-link[type="submit"],
+        body.es-role-citizen .es-sidebar button.es-nav-link {
+            color: #94A3B8;
+        }
+
+        body.es-role-citizen .es-sidebar .es-nav-link[type="submit"]:hover,
+        body.es-role-citizen .es-sidebar button.es-nav-link:hover {
+            color: #FCA5A5;
+            background: rgba(239,68,68,0.1);
+            border-color: rgba(239,68,68,0.2);
+        }
+
+        /* ── Glass topbar ── */
+        body.es-role-citizen .es-topbar {
+            border-bottom: 1px solid rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.6);
+            backdrop-filter: blur(20px) saturate(1.6);
+            -webkit-backdrop-filter: blur(20px) saturate(1.6);
+            box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-citizen .es-topbar.is-scrolled {
+            border-bottom-color: rgba(203,213,225,0.5);
+            box-shadow: 0 8px 32px rgba(15,23,42,0.08);
+            background: rgba(255,255,255,0.72);
+        }
+
+        body.es-role-citizen .es-topbar-title {
+            color: #0F172A;
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #0F172A 0%, #334155 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        body.es-role-citizen .es-topbar-btn {
+            transition: all .2s ease;
+        }
+
+        body.es-role-citizen .es-topbar-btn:hover {
+            background: rgba(14,165,233,0.08);
+            color: #0EA5E9;
+        }
+
+        /* ── Avatar glow ── */
+        body.es-role-citizen .es-avatar {
+            color: #0369A1;
+            background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%);
+            border: 2px solid rgba(56,189,248,0.4);
+            box-shadow: 0 0 0 3px rgba(14,165,233,0.1), 0 8px 20px rgba(14,165,233,0.2);
+            transition: all .3s ease;
+        }
+
+        body.es-role-citizen .es-avatar:hover {
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.15), 0 12px 28px rgba(14,165,233,0.3);
+            transform: scale(1.05);
+        }
+
+        /* ── Glass cards ── */
+        body.es-role-citizen .card {
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.7);
+            backdrop-filter: blur(12px) saturate(1.4);
+            -webkit-backdrop-filter: blur(12px) saturate(1.4);
+            box-shadow: 0 4px 16px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.02);
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-citizen .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(15,23,42,0.08), 0 8px 16px rgba(14,165,233,0.06);
+            border-color: rgba(14,165,233,0.2);
+        }
+
+        body.es-role-citizen .card-header {
+            background: rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(226,232,240,0.6);
+        }
+
+        /* ── Gradient primary button with glow ── */
+        body.es-role-citizen .btn-primary {
+            background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%);
+            border: none;
+            box-shadow: 0 4px 14px rgba(14,165,233,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.es-role-citizen .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+            transition: left .5s ease;
+        }
+
+        body.es-role-citizen .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(14,165,233,0.4), 0 0 0 2px rgba(14,165,233,0.1);
+            background: linear-gradient(135deg, #0284C7 0%, #4F46E5 100%);
+        }
+
+        body.es-role-citizen .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        body.es-role-citizen .btn-outline-primary {
+            border: 1.5px solid rgba(14,165,233,0.4);
+            color: #0284C7;
+            background: rgba(224,242,254,0.3);
+            transition: all .22s ease;
+        }
+
+        body.es-role-citizen .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%);
+            border-color: transparent;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(14,165,233,0.3);
+        }
+
+        /* ── Enhanced table ── */
+        body.es-role-citizen .table {
+            --bs-table-bg: transparent;
+        }
+
+        body.es-role-citizen .table th {
+            background: rgba(248,250,252,0.6);
+            backdrop-filter: blur(4px);
+            font-size: .67rem;
+            letter-spacing: .08em;
+            color: #94A3B8;
+        }
+
+        body.es-role-citizen .table-hover tbody tr {
+            transition: all .2s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-citizen .table-hover tbody tr:hover {
+            transform: scale(1.005);
+            background: rgba(224,242,254,0.25) !important;
+        }
+
+        body.es-role-citizen .table-hover tbody tr:hover > td {
+            background: transparent;
+        }
+
+        /* ── Form inputs glass ── */
+        body.es-role-citizen .form-control,
+        body.es-role-citizen .form-select {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #93B4D8;
+            backdrop-filter: blur(4px);
+            transition: all .25s ease;
+        }
+
+        body.es-role-citizen .form-control:focus,
+        body.es-role-citizen .form-select:focus {
+            background: rgba(255,255,255,0.9);
+            border-color: #0EA5E9;
+            box-shadow: 0 0 0 4px rgba(14,165,233,0.1), 0 4px 12px rgba(14,165,233,0.08);
+        }
+
+        /* ── Staggered reveal animation ── */
+        body.es-role-citizen .citizen-reveal,
+        body.es-role-citizen [data-citizen-reveal] {
+            opacity: 0;
+            transform: translateY(16px) scale(0.98);
+            transition: opacity .5s cubic-bezier(.4,0,.2,1), transform .5s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-citizen .citizen-reveal.is-visible,
+        body.es-role-citizen [data-citizen-reveal].is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* Stagger children */
+        body.es-role-citizen .citizen-reveal:nth-child(2) { transition-delay: .06s; }
+        body.es-role-citizen .citizen-reveal:nth-child(3) { transition-delay: .12s; }
+        body.es-role-citizen .citizen-reveal:nth-child(4) { transition-delay: .18s; }
+        body.es-role-citizen .citizen-reveal:nth-child(5) { transition-delay: .24s; }
+        body.es-role-citizen .citizen-reveal:nth-child(6) { transition-delay: .30s; }
+
+        /* ── Utility: shimmer sweep ── */
+        @keyframes citizenShimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+
+        /* ── Utility: gradient text ── */
+        body.es-role-citizen .citizen-gradient-text {
+            background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 50%, #8B5CF6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ── Scrollbar styling for citizen ── */
+        body.es-role-citizen .es-sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        body.es-role-citizen .es-sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        body.es-role-citizen .es-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        body.es-role-citizen .es-sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* ── Footer ── */
+        body.es-role-citizen .es-footer {
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(8px);
+            border-top-color: rgba(226,232,240,0.5);
+        }
+
+        /* ── Reduced motion ── */
+        @media (prefers-reduced-motion: reduce) {
+            body.es-role-citizen .es-content::before,
+            body.es-role-citizen .es-content::after,
+            body.es-role-citizen .card,
+            body.es-role-citizen .btn,
+            body.es-role-citizen .es-nav-link,
+            body.es-role-citizen .citizen-reveal,
+            body.es-role-citizen [data-citizen-reveal] {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           OFFICE PANEL — PREMIUM DESIGN SYSTEM
+           Dark sidebar · Glass cards · Gradient accents
+           ═══════════════════════════════════════════════════════ */
+
+        body.es-role-office_user .es-wrapper {
+            letter-spacing: .01px;
+        }
+
+        body.es-role-office_user .es-content {
+            position: relative;
+            background:
+                radial-gradient(ellipse at 10% -5%, rgba(59,130,246,0.16) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 110%, rgba(14,165,233,0.1) 0%, transparent 50%),
+                var(--es-bg);
+            overflow: hidden;
+        }
+
+        body.es-role-office_user .es-content::before {
+            content: '';
+            position: fixed;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            top: -100px;
+            right: -60px;
+            background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%);
+            animation: officeOrbit 22s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(60px);
+        }
+
+        body.es-role-office_user .es-content > *:not(.modal):not(.modal-backdrop) {
+            position: relative;
+            z-index: 1;
+        }
+
+        body.es-role-office_user .es-content > .modal {
+            z-index: 1060;
+        }
+
+        @keyframes officeOrbit {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-30px, 40px) scale(1.05); }
+        }
+
+        /* ── Dark sidebar ── */
+        body.es-role-office_user .es-sidebar {
+            background: linear-gradient(180deg, #0C1222 0%, #131D33 50%, #0E1628 100%);
+            border-right: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.25), 1px 0 0 rgba(255,255,255,0.03);
+        }
+
+        body.es-role-office_user .es-sidebar-brand {
+            border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        }
+
+        body.es-role-office_user .es-brand-name {
+            color: #F1F5F9 !important;
+        }
+
+        body.es-role-office_user .es-brand-sub {
+            color: #64748B !important;
+        }
+
+        body.es-role-office_user .es-nav-section {
+            color: rgba(148,163,184,0.55);
+            letter-spacing: .1em;
+            font-size: .62rem;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        body.es-role-office_user .es-nav-link {
+            margin: .15rem .65rem;
+            border: 1px solid transparent;
+            border-radius: .6rem;
+            padding: .58rem .9rem;
+            font-weight: 500;
+            color: #94A3B8;
+            transition: all .22s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-office_user .es-nav-link i {
+            color: #64748B;
+            transition: color .22s ease;
+        }
+
+        body.es-role-office_user .es-nav-link:hover {
+            transform: translateX(3px);
+            color: #E2E8F0;
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.07);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+        }
+
+        body.es-role-office_user .es-nav-link:hover i {
+            color: #60A5FA;
+        }
+
+        body.es-role-office_user .es-nav-link.active {
+            color: #FFFFFF;
+            border-color: rgba(59,130,246,0.25);
+            background: linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(14,165,233,0.15) 100%);
+            box-shadow: 0 8px 24px rgba(37,99,235,0.18), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+
+        body.es-role-office_user .es-nav-link.active i {
+            color: #60A5FA;
+        }
+
+        body.es-role-office_user .es-nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, #3B82F6, #06B6D4);
+            box-shadow: 0 0 12px rgba(59,130,246,0.5);
+        }
+
+        body.es-role-office_user .es-nav-badge {
+            background: linear-gradient(135deg, #2563EB, #0EA5E9) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.4);
+        }
+
+        body.es-role-office_user .es-sidebar .es-nav-link[type="submit"],
+        body.es-role-office_user .es-sidebar button.es-nav-link {
+            color: #94A3B8;
+        }
+
+        body.es-role-office_user .es-sidebar .es-nav-link[type="submit"]:hover,
+        body.es-role-office_user .es-sidebar button.es-nav-link:hover {
+            color: #FCA5A5;
+            background: rgba(239,68,68,0.1);
+            border-color: rgba(239,68,68,0.2);
+        }
+
+        /* ── Glass topbar ── */
+        body.es-role-office_user .es-topbar {
+            border-bottom: 1px solid rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(18px) saturate(1.5);
+            -webkit-backdrop-filter: blur(18px) saturate(1.5);
+            box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-office_user .es-topbar.is-scrolled {
+            border-bottom-color: rgba(203,213,225,0.45);
+            box-shadow: 0 8px 28px rgba(15,23,42,0.07);
+            background: rgba(255,255,255,0.68);
+        }
+
+        body.es-role-office_user .es-topbar-title {
+            color: #0F172A;
+            font-size: 1.04rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #0F172A 0%, #334155 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        body.es-role-office_user .es-avatar {
+            color: #1D4ED8;
+            background: linear-gradient(135deg, #DBEAFE 0%, #C7D2FE 100%);
+            border: 2px solid rgba(59,130,246,0.35);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.08), 0 8px 20px rgba(37,99,235,0.18);
+            transition: all .3s ease;
+        }
+
+        body.es-role-office_user .es-avatar:hover {
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.12), 0 12px 28px rgba(37,99,235,0.25);
+            transform: scale(1.05);
+        }
+
+        /* ── Glass cards ── */
+        body.es-role-office_user .card {
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.45);
+            background: rgba(255,255,255,0.65);
+            backdrop-filter: blur(12px) saturate(1.3);
+            -webkit-backdrop-filter: blur(12px) saturate(1.3);
+            box-shadow: 0 4px 16px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.02);
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-office_user .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(15,23,42,0.07), 0 8px 16px rgba(37,99,235,0.05);
+            border-color: rgba(37,99,235,0.18);
+        }
+
+        body.es-role-office_user .card-header {
+            background: rgba(255,255,255,0.25);
+            border-bottom: 1px solid rgba(226,232,240,0.55);
+        }
+
+        /* ── Gradient primary button ── */
+        body.es-role-office_user .btn-primary {
+            background: linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%);
+            border: none;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.es-role-office_user .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%);
+            transition: left .5s ease;
+        }
+
+        body.es-role-office_user .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(37,99,235,0.4), 0 0 0 2px rgba(37,99,235,0.08);
+            background: linear-gradient(135deg, #1D4ED8 0%, #0284C7 100%);
+        }
+
+        body.es-role-office_user .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        body.es-role-office_user .btn-outline-primary {
+            border: 1.5px solid rgba(37,99,235,0.35);
+            color: #1D4ED8;
+            background: rgba(219,234,254,0.25);
+            transition: all .22s ease;
+        }
+
+        body.es-role-office_user .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%);
+            border-color: transparent;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(37,99,235,0.28);
+        }
+
+        body.es-role-office_user .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* ── Enhanced tables ── */
+        body.es-role-office_user .table th {
+            background: rgba(248,250,252,0.55);
+            backdrop-filter: blur(4px);
+        }
+
+        body.es-role-office_user .table-hover tbody tr {
+            transition: all .2s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-office_user .table-hover tbody tr:hover {
+            transform: scale(1.004);
+            background: rgba(219,234,254,0.2) !important;
+        }
+
+        body.es-role-office_user .table-hover tbody tr:hover > td {
+            background: transparent;
+        }
+
+        /* ── Staggered reveal ── */
+        body.es-role-office_user .office-reveal,
+        body.es-role-office_user [data-office-reveal] {
+            opacity: 0;
+            transform: translateY(14px) scale(0.98);
+            transition: opacity .5s cubic-bezier(.4,0,.2,1), transform .5s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-office_user .office-reveal.is-visible,
+        body.es-role-office_user [data-office-reveal].is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        body.es-role-office_user .office-reveal:nth-child(2) { transition-delay: .06s; }
+        body.es-role-office_user .office-reveal:nth-child(3) { transition-delay: .12s; }
+        body.es-role-office_user .office-reveal:nth-child(4) { transition-delay: .18s; }
+        body.es-role-office_user .office-reveal:nth-child(5) { transition-delay: .24s; }
+
+        /* ── Glass forms ── */
+        body.es-role-office_user .form-control,
+        body.es-role-office_user .form-select {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #94A3B8;
+            backdrop-filter: blur(4px);
+            transition: all .25s ease;
+        }
+
+        body.es-role-office_user .form-control:focus,
+        body.es-role-office_user .form-select:focus {
+            background: rgba(255,255,255,0.9);
+            border-color: #2563EB;
+            box-shadow: 0 0 0 4px rgba(37,99,235,0.1), 0 4px 12px rgba(37,99,235,0.06);
+        }
+
+        /* ── Scrollbar ── */
+        body.es-role-office_user .es-sidebar::-webkit-scrollbar { width: 4px; }
+        body.es-role-office_user .es-sidebar::-webkit-scrollbar-track { background: transparent; }
+        body.es-role-office_user .es-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+        body.es-role-office_user .es-footer {
+            background: rgba(255,255,255,0.45);
+            backdrop-filter: blur(8px);
+            border-top-color: rgba(226,232,240,0.45);
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           ADMIN PANEL — PREMIUM DESIGN SYSTEM
+           Dark sidebar · Glass cards · Indigo accents
+           ═══════════════════════════════════════════════════════ */
+
+        body.es-role-admin .es-content {
+            position: relative;
+            background:
+                radial-gradient(ellipse at 8% -8%, rgba(37,99,235,0.12) 0%, transparent 48%),
+                radial-gradient(ellipse at 95% 105%, rgba(99,102,241,0.08) 0%, transparent 48%),
+                var(--es-bg);
+            overflow: hidden;
+        }
+
+        body.es-role-admin .es-content::before {
+            content: '';
+            position: fixed;
+            width: 420px;
+            height: 420px;
+            border-radius: 50%;
+            top: -80px;
+            left: -40px;
+            background: radial-gradient(circle, rgba(37,99,235,0.06) 0%, transparent 70%);
+            animation: adminOrbit 28s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(60px);
+        }
+
+        body.es-role-admin .es-content > *:not(.modal):not(.modal-backdrop) {
+            position: relative;
+            z-index: 1;
+        }
+
+        body.es-role-admin .es-content > .modal {
+            z-index: 1060;
+        }
+
+        @keyframes adminOrbit {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, 50px) scale(1.06); }
+        }
+
+        /* ── Dark sidebar ── */
+        body.es-role-admin .es-sidebar {
+            background: linear-gradient(180deg, #0D1321 0%, #141E30 50%, #101826 100%);
+            border-right: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.28), 1px 0 0 rgba(255,255,255,0.03);
+        }
+
+        body.es-role-admin .es-sidebar-brand {
+            border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        }
+
+        body.es-role-admin .es-brand-name {
+            color: #F1F5F9 !important;
+        }
+
+        body.es-role-admin .es-brand-sub {
+            color: #64748B !important;
+        }
+
+        body.es-role-admin .es-nav-section {
+            color: rgba(148,163,184,0.5);
+            letter-spacing: .1em;
+            font-size: .62rem;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        body.es-role-admin .es-nav-link {
+            border: 1px solid transparent;
+            margin: .15rem .65rem;
+            padding: .58rem .9rem;
+            border-radius: .6rem;
+            font-weight: 500;
+            color: #94A3B8;
+            transition: all .22s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-admin .es-nav-link i {
+            color: #64748B;
+            transition: color .22s ease;
+        }
+
+        body.es-role-admin .es-nav-link:hover {
+            transform: translateX(3px);
+            color: #E2E8F0;
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.07);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+        }
+
+        body.es-role-admin .es-nav-link:hover i {
+            color: #818CF8;
+        }
+
+        body.es-role-admin .es-nav-link.active {
+            color: #FFFFFF;
+            border-color: rgba(99,102,241,0.25);
+            background: linear-gradient(135deg, rgba(37,99,235,0.22) 0%, rgba(99,102,241,0.16) 100%);
+            box-shadow: 0 8px 24px rgba(37,99,235,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+
+        body.es-role-admin .es-nav-link.active i {
+            color: #818CF8;
+        }
+
+        body.es-role-admin .es-nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, #6366F1, #2563EB);
+            box-shadow: 0 0 12px rgba(99,102,241,0.5);
+        }
+
+        body.es-role-admin .es-nav-badge {
+            background: linear-gradient(135deg, #6366F1, #2563EB) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(99,102,241,0.4);
+        }
+
+        body.es-role-admin .es-sidebar .es-nav-link[type="submit"],
+        body.es-role-admin .es-sidebar button.es-nav-link {
+            color: #94A3B8;
+        }
+
+        body.es-role-admin .es-sidebar .es-nav-link[type="submit"]:hover,
+        body.es-role-admin .es-sidebar button.es-nav-link:hover {
+            color: #FCA5A5;
+            background: rgba(239,68,68,0.1);
+            border-color: rgba(239,68,68,0.2);
+        }
+
+        /* ── Glass topbar ── */
+        body.es-role-admin .es-topbar {
+            border-bottom: 1px solid rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(18px) saturate(1.5);
+            -webkit-backdrop-filter: blur(18px) saturate(1.5);
+            box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-admin .es-topbar.is-scrolled {
+            border-bottom-color: rgba(203,213,225,0.4);
+            box-shadow: 0 8px 28px rgba(15,23,42,0.07);
+            background: rgba(255,255,255,0.68);
+        }
+
+        body.es-role-admin .es-topbar-title {
+            font-size: 1.04rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #0F172A 0%, #475569 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        body.es-role-admin .es-avatar {
+            background: linear-gradient(135deg, #DBEAFE 0%, #E0E7FF 100%);
+            border: 2px solid rgba(99,102,241,0.3);
+            color: #4338CA;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.08), 0 8px 20px rgba(99,102,241,0.16);
+            transition: all .3s ease;
+        }
+
+        body.es-role-admin .es-avatar:hover {
+            box-shadow: 0 0 0 4px rgba(99,102,241,0.12), 0 12px 28px rgba(99,102,241,0.22);
+            transform: scale(1.05);
+        }
+
+        /* ── Glass cards ── */
+        body.es-role-admin .card {
+            border-radius: .95rem;
+            border: 1px solid rgba(255,255,255,0.45);
+            background: rgba(255,255,255,0.65);
+            backdrop-filter: blur(12px) saturate(1.3);
+            -webkit-backdrop-filter: blur(12px) saturate(1.3);
+            box-shadow: 0 4px 16px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.02);
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-admin .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 36px rgba(15,23,42,0.07), 0 6px 14px rgba(37,99,235,0.04);
+            border-color: rgba(37,99,235,0.15);
+        }
+
+        body.es-role-admin .card-header {
+            padding-top: 1.05rem;
+            padding-bottom: 0.8rem;
+            background: rgba(255,255,255,0.25);
+            border-bottom: 1px solid rgba(226,232,240,0.55);
+        }
+
+        body.es-role-admin .card-title {
+            color: #334155;
+        }
+
+        body.es-role-admin .table th {
+            background: rgba(248,250,252,0.55);
+            backdrop-filter: blur(4px);
+            color: #8A96A8;
+        }
+
+        body.es-role-admin .table-hover tbody tr {
+            transition: all .2s cubic-bezier(.4,0,.2,1);
+        }
+
+        body.es-role-admin .table-hover tbody tr:hover {
+            transform: scale(1.003);
+            background: rgba(219,234,254,0.18) !important;
+        }
+
+        body.es-role-admin .table-hover tbody tr:hover > td {
+            background: transparent;
+        }
+
+        /* ── Gradient primary button ── */
+        body.es-role-admin .btn-primary {
+            background: linear-gradient(135deg, #4F46E5 0%, #2563EB 100%);
+            border: none;
+            box-shadow: 0 4px 14px rgba(79,70,229,0.3), inset 0 1px 0 rgba(255,255,255,0.12);
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.es-role-admin .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+            transition: left .5s ease;
+        }
+
+        body.es-role-admin .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(79,70,229,0.4), 0 0 0 2px rgba(79,70,229,0.08);
+            background: linear-gradient(135deg, #4338CA 0%, #1D4ED8 100%);
+        }
+
+        body.es-role-admin .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        body.es-role-admin .btn-outline-primary {
+            border: 1.5px solid rgba(79,70,229,0.35);
+            color: #4338CA;
+            background: rgba(238,242,255,0.25);
+            transition: all .22s ease;
+        }
+
+        body.es-role-admin .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #4F46E5 0%, #2563EB 100%);
+            border-color: transparent;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(79,70,229,0.28);
+        }
+
+        /* ── Glass forms ── */
+        body.es-role-admin .form-control,
+        body.es-role-admin .form-select {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #94A3B8;
+            backdrop-filter: blur(4px);
+            transition: all .25s ease;
+        }
+
+        body.es-role-admin .form-control:focus,
+        body.es-role-admin .form-select:focus {
+            background: rgba(255,255,255,0.9);
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 4px rgba(79,70,229,0.1), 0 4px 12px rgba(79,70,229,0.06);
+        }
+
+        body.es-role-admin .breadcrumb-item a {
+            color: #697A8D;
+        }
+
+        body.es-role-admin .breadcrumb-item.active {
+            color: #334155;
+        }
+
+        /* ── Scrollbar ── */
+        body.es-role-admin .es-sidebar::-webkit-scrollbar { width: 4px; }
+        body.es-role-admin .es-sidebar::-webkit-scrollbar-track { background: transparent; }
+        body.es-role-admin .es-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+        body.es-role-admin .es-footer {
+            background: rgba(255,255,255,0.45);
+            backdrop-filter: blur(8px);
+            border-top-color: rgba(226,232,240,0.45);
+        }
+
+        body.es-role-admin .admin-page-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+            flex-wrap: wrap;
+        }
+
+        body.es-role-admin .admin-page-title {
+            font-weight: 700;
+            margin: 0;
+            font-size: 1rem;
+            color: #566A7F;
+        }
+
+        body.es-role-admin .admin-page-sub {
+            color: var(--es-muted);
+            font-size: .78rem;
+            margin: 0;
+        }
+
+        body.es-role-admin .admin-muted {
+            color: var(--es-muted) !important;
+        }
+
+        body.es-role-admin .admin-stat-label {
+            font-size: .76rem;
+            color: var(--es-muted);
+            font-weight: 500;
+        }
+
+        body.es-role-admin .admin-stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #566A7F;
+        }
+
+        body.es-role-admin .admin-stat-sub {
+            font-size: .72rem;
+            color: var(--es-muted);
+        }
+
+        body.es-role-admin .admin-kpi-trend-wrap {
+            margin-top: .4rem;
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            flex-wrap: wrap;
+        }
+
+        body.es-role-admin .admin-kpi-trend {
+            display: inline-flex;
+            align-items: center;
+            gap: .22rem;
+            padding: .14rem .45rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: .66rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        body.es-role-admin .admin-kpi-trend-up {
+            color: var(--es-emerald);
+            background: var(--es-emerald-s);
+            border-color: #A7F3D0;
+        }
+
+        body.es-role-admin .admin-kpi-trend-down {
+            color: var(--es-rose);
+            background: var(--es-rose-s);
+            border-color: #FECDD3;
+        }
+
+        body.es-role-admin .admin-kpi-trend-flat {
+            color: var(--es-muted);
+            background: #EEF2F7;
+            border-color: var(--es-border-soft);
+        }
+
+        body.es-role-admin .admin-kpi-trend-label {
+            color: var(--es-muted);
+            font-size: .68rem;
+            font-weight: 500;
+        }
+
+        body.es-role-admin .admin-plain-btn {
+            background: #EEF2F7;
+            border: 1px solid var(--es-border-soft);
+            color: #566A7F;
+        }
+
+        body.es-role-admin .admin-plain-btn:hover {
+            background: #E3E9F1;
+            color: #44546A;
+        }
+
+        body.es-role-admin .admin-icon-btn {
+            border: 1px solid var(--es-border-soft);
+            background: #EEF2F7;
+            color: #566A7F;
+        }
+
+        body.es-role-admin .admin-icon-btn:hover {
+            background: #E3E9F1;
+            color: #44546A;
+        }
+
+        body.es-role-admin .admin-trash-btn {
+            background: #FEE2E2;
+            border: 1px solid #FECACA;
+            color: #DC2626;
+        }
+
+        body.es-role-admin .admin-trash-btn:hover {
+            background: #FECACA;
+            color: #B91C1C;
+        }
+
+        body.es-role-admin .admin-empty-state {
+            padding: 2rem 1.25rem;
+            text-align: center;
+            color: var(--es-muted);
+        }
+
+        body.es-role-admin .admin-empty-state-icon {
+            width: 2.7rem;
+            height: 2.7rem;
+            border-radius: .75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--es-primary-s);
+            color: var(--es-primary);
+            border: 1px solid var(--es-primary-m);
+            margin-bottom: .65rem;
+            font-size: 1.05rem;
+        }
+
+        body.es-role-admin .admin-empty-state-title {
+            color: #566A7F;
+            font-weight: 700;
+            font-size: .84rem;
+        }
+
+        body.es-role-admin .admin-empty-state-copy {
+            margin-top: .18rem;
+            font-size: .76rem;
+        }
+
+        body.es-role-admin .admin-quick-modal .modal-dialog {
+            max-width: 560px;
+        }
+
+        body.es-role-admin .admin-quick-modal .modal-content {
+            border: 1px solid var(--es-border-soft);
+            border-radius: .95rem;
+            box-shadow: 0 22px 56px rgba(15, 23, 42, .14);
+        }
+
+        body.es-role-admin .admin-quick-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .58rem;
+        }
+
+        body.es-role-admin .admin-quick-link {
+            display: flex;
+            align-items: center;
+            gap: .56rem;
+            border: 1px solid var(--es-border-soft);
+            border-radius: .68rem;
+            padding: .62rem .72rem;
+            color: #475569;
+            background: #F8FAFC;
+            font-size: .79rem;
+            font-weight: 600;
+            transition: all .16s ease;
+            text-decoration: none;
+        }
+
+        body.es-role-admin .admin-quick-link:hover {
+            color: var(--es-primary);
+            background: var(--es-primary-s);
+            border-color: var(--es-primary-m);
+        }
+
+        body.es-role-admin .admin-quick-key {
+            margin-left: auto;
+            border: 1px solid var(--es-border-soft);
+            background: #fff;
+            color: #64748B;
+            border-radius: .42rem;
+            font-size: .62rem;
+            font-weight: 700;
+            padding: .12rem .34rem;
+            line-height: 1;
+        }
+
+        body.es-role-admin .admin-table-toolbar {
+            padding: .7rem 1rem;
+            border-bottom: 1px solid var(--es-border-soft);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+            flex-wrap: wrap;
+            background: linear-gradient(180deg, rgba(248, 250, 252, 0.8) 0%, rgba(248, 250, 252, 0.45) 100%);
+        }
+
+        body.es-role-admin .admin-table-toolbar-title {
+            font-size: .82rem;
+            font-weight: 600;
+            color: #566A7F;
+        }
+
+        body.es-role-admin .admin-table-toolbar-sub {
+            font-size: .74rem;
+            color: var(--es-muted);
+            margin-top: 1px;
+        }
+
+        body.es-role-admin .admin-table-wrap {
+            max-height: 36rem;
+            overflow: auto;
+        }
+
+        body.es-role-admin .admin-table-sticky thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #F8FAFC;
+            box-shadow: inset 0 -1px 0 var(--es-border-soft);
+        }
+
+        body.es-role-admin .admin-table-interactive th[data-sort] {
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            padding-right: 1.45rem;
+        }
+
+        body.es-role-admin .admin-table-interactive th[data-sort]::after {
+            content: '\F282';
+            font-family: 'bootstrap-icons';
+            font-size: .62rem;
+            color: #94A3B8;
+            position: absolute;
+            right: .58rem;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: .85;
+            transition: color .16s ease, opacity .16s ease;
+        }
+
+        body.es-role-admin .admin-table-interactive th[data-sort].is-asc::after {
+            content: '\F235';
+            color: var(--es-primary);
+            opacity: 1;
+        }
+
+        body.es-role-admin .admin-table-interactive th[data-sort].is-desc::after {
+            content: '\F229';
+            color: var(--es-primary);
+            opacity: 1;
+        }
+
+        body.es-role-admin .admin-table-compact th {
+            padding-top: .45rem !important;
+            padding-bottom: .45rem !important;
+            font-size: .66rem;
+        }
+
+        body.es-role-admin .admin-table-compact td {
+            padding-top: .48rem !important;
+            padding-bottom: .48rem !important;
+        }
+
+        body.es-role-admin .admin-density-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: .32rem;
+        }
+
+        body.es-role-admin .admin-density-btn {
+            border: 1px solid var(--es-border-soft);
+            border-radius: .48rem;
+            background: #EEF2F7;
+            color: #566A7F;
+            font-size: .67rem;
+            font-weight: 600;
+            line-height: 1;
+            padding: .32rem .46rem;
+            transition: all .16s ease;
+        }
+
+        body.es-role-admin .admin-density-btn.is-active {
+            background: var(--es-primary-s);
+            color: var(--es-primary);
+            border-color: var(--es-primary-m);
+        }
+
+        body.es-role-admin .admin-chip-filters {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            flex-wrap: wrap;
+            padding: .56rem .95rem;
+            border-bottom: 1px solid var(--es-border-soft);
+            background: #FCFDFE;
+        }
+
+        body.es-role-admin .admin-chip-filter {
+            border: 1px solid var(--es-border-soft);
+            background: #EEF2F7;
+            color: #64748B;
+            border-radius: 999px;
+            font-size: .67rem;
+            font-weight: 700;
+            padding: .2rem .58rem;
+            transition: all .16s ease;
+        }
+
+        body.es-role-admin .admin-chip-filter.is-active {
+            background: var(--es-primary-s);
+            color: var(--es-primary);
+            border-color: var(--es-primary-m);
+        }
+
+        @keyframes adminBusyShimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        body.es-role-admin .admin-busy-target {
+            position: relative;
+        }
+
+        body.es-role-admin .admin-busy-target.admin-is-busy {
+            pointer-events: none;
+        }
+
+        body.es-role-admin .admin-busy-target.admin-is-busy::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, .66);
+            z-index: 15;
+            backdrop-filter: blur(1px);
+            -webkit-backdrop-filter: blur(1px);
+        }
+
+        body.es-role-admin .admin-busy-target.admin-is-busy::after {
+            content: '';
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            width: min(18rem, calc(100% - 2rem));
+            height: .8rem;
+            border-radius: .45rem;
+            background: linear-gradient(90deg, rgba(148, 163, 184, .2) 0%, rgba(148, 163, 184, .42) 50%, rgba(148, 163, 184, .2) 100%);
+            z-index: 16;
+            animation: adminBusyShimmer 1.05s ease-in-out infinite;
+        }
+
+        body.es-role-admin .admin-reveal {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity .34s ease, transform .34s ease;
+        }
+
+        body.es-role-admin .admin-reveal.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        body.es-role-admin .btn {
+            transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease;
+        }
+
+        body.es-role-admin .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        body.es-role-admin .card {
+            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+        }
+
+        body.es-role-admin .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+            border-color: color-mix(in srgb, var(--es-primary) 20%, var(--es-border-soft) 80%);
+        }
+
+        body.es-role-admin .table-hover tbody tr {
+            transition: transform .18s ease;
+        }
+
+        body.es-role-admin .table-hover tbody tr:hover {
+            transform: translateX(2px);
+        }
+
+        body.es-role-admin .modal.fade .modal-dialog {
+            transition: transform .22s ease, opacity .22s ease;
+        }
+
+        body.es-role-admin .modal.fade:not(.show) .modal-dialog {
+            transform: translateY(12px) scale(.985);
+        }
+
+        @keyframes adminFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        body.es-role-admin.admin-motion-ready .es-content > * {
+            opacity: 0;
+            animation: adminFadeUp .42s ease forwards;
+            will-change: opacity, transform;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            body.es-role-admin .btn,
+            body.es-role-admin .card,
+            body.es-role-admin .table-hover tbody tr,
+            body.es-role-admin .modal.fade .modal-dialog,
+            body.es-role-admin .admin-reveal {
+                transition: none !important;
+            }
+
+            body.es-role-admin.admin-motion-ready .es-content > * {
+                opacity: 1;
+                animation: none;
+            }
+
+            body.es-role-admin .admin-reveal {
+                opacity: 1;
+                transform: none;
+            }
+
+            body.es-role-citizen .btn,
+            body.es-role-citizen .card,
+            body.es-role-citizen .table-hover tbody tr,
+            body.es-role-citizen .citizen-reveal,
+            body.es-role-citizen [data-citizen-reveal] {
+                transition: none !important;
+            }
+
+            body.es-role-citizen .citizen-reveal,
+            body.es-role-citizen [data-citizen-reveal] {
+                opacity: 1;
+                transform: none;
+            }
+
+            body.es-role-office_user .btn,
+            body.es-role-office_user .card,
+            body.es-role-office_user .table-hover tbody tr,
+            body.es-role-office_user .office-reveal,
+            body.es-role-office_user [data-office-reveal] {
+                transition: none !important;
+            }
+
+            body.es-role-office_user .office-reveal,
+            body.es-role-office_user [data-office-reveal] {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            body.es-role-admin .admin-quick-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
+    @yield('vendor-style')
+    @yield('page-style')
+    @vite(['resources/js/app.js'])
     @stack('styles')
 </head>
-<body>
+@php
+    $roleClass = auth()->check() ? 'es-role-' . auth()->user()->role : 'es-role-guest';
+@endphp
+<body class="{{ $roleClass }}">
 
 @auth
-<div class="sb-overlay" id="sbOverlay"></div>
+@php
+    $user = auth()->user();
+    $baseHome = match ($user->role) {
+        'admin'       => route('admin.dashboard'),
+        'office_user' => route('office.dashboard'),
+        default       => route('citizen.dashboard'),
+    };
+    $pendingOfficeRequests = $user->isOfficeUser()
+        ? ($user->offices()->first()?->requests()->where('status', 'pending')->count() ?? 0)
+        : 0;
+    $activeCitizenRequests = $user->isCitizen()
+        ? $user->serviceRequests()->whereNotIn('status', ['completed', 'rejected'])->count()
+        : 0;
+    $adminOpenTickets = $user->isAdmin()
+        ? \App\Models\SupportTicket::where('status', 'open')->count()
+        : 0;
+    $citizenSupportUnread = $user->isCitizen()
+        ? \App\Models\SupportTicketMessage::whereHas('ticket', fn($q) => $q->where('user_id', $user->id))
+            ->where('sender_id', '!=', $user->id)
+            ->whereNull('read_at')
+            ->count()
+        : 0;
+    $unreadCount = $user->unreadNotifications()->count();
+@endphp
 
-<aside class="sidebar" id="sidebar" aria-label="Navigation">
-    <a href="{{ match(auth()->user()->role) { 'admin' => route('admin.dashboard'), 'office_user' => route('office.dashboard'), default => route('citizen.dashboard') } }}" class="sb-brand">
-        <div class="sb-mark"><i class="bi bi-building-check"></i></div>
-        <div><div class="sb-name">E-Services</div><div class="sb-sub">Gov Portal</div></div>
-    </a>
-    <div class="sb-scroll">
-        <nav>
-        @if(auth()->user()->isAdmin())
-            <div class="sb-section">Overview</div>
-            <a href="{{ route('admin.dashboard') }}" class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active':'' }}"><i class="bi bi-speedometer2 ni"></i> Dashboard</a>
-            <div class="sb-section">Management</div>
-            <a href="{{ route('admin.municipalities') }}" class="nav-link {{ request()->routeIs('admin.municipalities*') ? 'active':'' }}"><i class="bi bi-geo-alt ni"></i> Municipalities</a>
-            <a href="{{ route('admin.offices') }}" class="nav-link {{ request()->routeIs('admin.offices*') ? 'active':'' }}"><i class="bi bi-building ni"></i> Offices</a>
-            <a href="{{ route('admin.users') }}" class="nav-link {{ request()->routeIs('admin.users*') ? 'active':'' }}"><i class="bi bi-people ni"></i> Users</a>
-            <div class="sb-section">Analytics</div>
-            <a href="{{ route('admin.reports') }}" class="nav-link {{ request()->routeIs('admin.reports*') ? 'active':'' }}"><i class="bi bi-bar-chart-line ni"></i> Reports</a>
-        @elseif(auth()->user()->isOfficeUser())
-            <div class="sb-section">Overview</div>
-            <a href="{{ route('office.dashboard') }}" class="nav-link {{ request()->routeIs('office.dashboard') ? 'active':'' }}"><i class="bi bi-speedometer2 ni"></i> Dashboard</a>
-            <div class="sb-section">Operations</div>
-            <a href="{{ route('office.services') }}" class="nav-link {{ request()->routeIs('office.services*') ? 'active':'' }}"><i class="bi bi-grid-3x3-gap ni"></i> Services</a>
-            <a href="{{ route('office.requests') }}" class="nav-link {{ request()->routeIs('office.requests*') ? 'active':'' }}">
-                <i class="bi bi-inbox-fill ni"></i> Requests
-                @php $pn = auth()->user()->offices()->first()?->requests()->where('status','pending')->count() ?? 0; @endphp
-                @if($pn > 0)<span class="nb">{{ $pn }}</span>@endif
-            </a>
-            <div class="sb-section">Engagement</div>
-            <a href="{{ route('office.appointments') }}" class="nav-link {{ request()->routeIs('office.appointments*') ? 'active':'' }}"><i class="bi bi-calendar-check ni"></i> Appointments</a>
-            <a href="{{ route('office.feedback') }}" class="nav-link {{ request()->routeIs('office.feedback*') ? 'active':'' }}"><i class="bi bi-star ni"></i> Feedback</a>
-            <div class="sb-section">Settings</div>
-            <a href="{{ route('office.profile') }}" class="nav-link {{ request()->routeIs('office.profile*') ? 'active':'' }}"><i class="bi bi-gear ni"></i> Office Profile</a>
-        @else
-            <div class="sb-section">Overview</div>
-            <a href="{{ route('citizen.dashboard') }}" class="nav-link {{ request()->routeIs('citizen.dashboard') ? 'active':'' }}"><i class="bi bi-house-fill ni"></i> Dashboard</a>
-            <div class="sb-section">Services</div>
-            <a href="{{ route('citizen.offices') }}" class="nav-link {{ request()->routeIs('citizen.offices*') ? 'active':'' }}"><i class="bi bi-building ni"></i> Browse Offices</a>
-            <a href="{{ route('citizen.requests') }}" class="nav-link {{ request()->routeIs('citizen.requests*') ? 'active':'' }}">
-                <i class="bi bi-file-text ni"></i> My Requests
-                @php $an = auth()->user()->serviceRequests()->whereNotIn('status',['completed','rejected'])->count(); @endphp
-                @if($an > 0)<span class="nb" style="background:var(--primary)">{{ $an }}</span>@endif
-            </a>
-            <div class="sb-section">Account</div>
-            <a href="{{ route('citizen.profile') }}" class="nav-link {{ request()->routeIs('citizen.profile*') ? 'active':'' }}"><i class="bi bi-person ni"></i> My Profile</a>
-        @endif
-        </nav>
-    </div>
-    <div class="sb-footer">
-        <div class="sb-user">
-            <div class="sb-av">{{ strtoupper(substr(auth()->user()->name,0,1)) }}</div>
-            <div style="flex:1;min-width:0">
-                <div class="sb-un">{{ auth()->user()->name }}</div>
-                <div class="sb-ur">{{ ucfirst(str_replace('_',' ',auth()->user()->role)) }}</div>
-            </div>
-            <form action="{{ route('logout') }}" method="POST">@csrf
-                <button type="submit" class="sb-logout" title="Sign out"><i class="bi bi-box-arrow-right"></i></button>
-            </form>
-        </div>
-    </div>
-</aside>
+{{-- Sidebar overlay (mobile) --}}
+<div class="es-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-<header class="topbar">
-    <button class="menu-btn" id="menuBtn" aria-label="Open menu"><i class="bi bi-list"></i></button>
-    <span class="top-title">@yield('page-title','Dashboard')</span>
-    <div class="top-right">
-        @php $unread = auth()->user()->unreadNotifications->count(); @endphp
-        <div class="dropdown">
-            <button class="top-btn" data-bs-toggle="dropdown" aria-label="Notifications">
-                <i class="bi bi-bell"></i>
-                @if($unread > 0)<span class="top-dot">{{ min($unread,9) }}</span>@endif
-            </button>
-            <div class="dropdown-menu dropdown-menu-end" style="width:300px">
-                <div class="dropdown-header" style="display:flex;align-items:center;justify-content:space-between">
-                    Notifications
-                    @if($unread)<span style="background:var(--rose-lt);color:var(--rose);font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:99px">{{ $unread }} new</span>@endif
-                </div>
-                @forelse(auth()->user()->unreadNotifications->take(6) as $n)
-                <a class="dropdown-item" href="#" style="white-space:normal">
-                    <div style="display:flex;gap:.45rem">
-                        <span style="width:7px;height:7px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:5px"></span>
-                        <div>
-                            <div style="font-size:.78rem;line-height:1.45;color:var(--ink-600)">{{ $n->data['message'] ?? 'New notification' }}</div>
-                            <div style="font-size:.65rem;color:var(--ink-400);margin-top:1px">{{ $n->created_at->diffForHumans() }}</div>
-                        </div>
-                    </div>
-                </a>
-                @empty
-                <div style="text-align:center;padding:1.75rem .5rem">
-                    <i class="bi bi-bell-slash" style="font-size:1.6rem;color:var(--ink-300);display:block;margin-bottom:.4rem"></i>
-                    <div style="font-size:.78rem;color:var(--ink-400)">All caught up!</div>
-                </div>
-                @endforelse
-            </div>
-        </div>
-        <div class="dropdown">
-            <div class="top-av" data-bs-toggle="dropdown" role="button" tabindex="0">{{ strtoupper(substr(auth()->user()->name,0,1)) }}</div>
-            <div class="dropdown-menu dropdown-menu-end" style="min-width:200px">
-                <div style="padding:.6rem .9rem .35rem">
-                    <div style="font-size:.85rem;font-weight:700;color:var(--ink-900)">{{ auth()->user()->name }}</div>
-                    <div style="font-size:.7rem;color:var(--ink-400)">{{ auth()->user()->email }}</div>
-                    <span class="sbadge s-active" style="margin-top:.35rem;font-size:.62rem">{{ ucfirst(str_replace('_',' ',auth()->user()->role)) }}</span>
-                </div>
-                <div class="dropdown-divider"></div>
-                @if(auth()->user()->isCitizen())
-                <a class="dropdown-item" href="{{ route('citizen.profile') }}"><i class="bi bi-person me-2"></i>My Profile</a>
-                @elseif(auth()->user()->isOfficeUser())
-                <a class="dropdown-item" href="{{ route('office.profile') }}"><i class="bi bi-gear me-2"></i>Office Settings</a>
-                @endif
-                <a class="dropdown-item" href="{{ route('security.2fa') }}"><i class="bi bi-shield-lock me-2"></i>2FA Security</a>
-                <div class="dropdown-divider"></div>
-                <form action="{{ route('logout') }}" method="POST">@csrf
-                    <button class="dropdown-item text-danger" style="width:100%;text-align:left;background:none;border:none;cursor:pointer">
-                        <i class="bi bi-box-arrow-right me-2"></i>Sign Out
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</header>
+{{-- Toast stack (global) --}}
+<div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
-<nav class="bnav">
-    @if(auth()->user()->isAdmin())
-        <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active':'' }}"><i class="bi bi-speedometer2"></i>Home</a>
-        <a href="{{ route('admin.offices') }}" class="{{ request()->routeIs('admin.offices*') ? 'active':'' }}"><i class="bi bi-building"></i>Offices</a>
-        <a href="{{ route('admin.users') }}" class="{{ request()->routeIs('admin.users*') ? 'active':'' }}"><i class="bi bi-people"></i>Users</a>
-        <a href="{{ route('admin.reports') }}" class="{{ request()->routeIs('admin.reports*') ? 'active':'' }}"><i class="bi bi-bar-chart-line"></i>Reports</a>
-    @elseif(auth()->user()->isOfficeUser())
-        <a href="{{ route('office.dashboard') }}" class="{{ request()->routeIs('office.dashboard') ? 'active':'' }}"><i class="bi bi-speedometer2"></i>Home</a>
-        <a href="{{ route('office.requests') }}" class="{{ request()->routeIs('office.requests*') ? 'active':'' }}">
-            <i class="bi bi-inbox-fill"></i>Requests
-            @if(($pn ?? 0) > 0)
-                <span class="bn-dot"></span>
-            @endif
+<div class="es-wrapper">
+
+    {{-- ── Sidebar ──────────────────────────────────────────── --}}
+    <aside class="es-sidebar" id="esSidebar">
+
+        {{-- Brand --}}
+        <a href="{{ $baseHome }}" class="es-sidebar-brand">
+            <span class="es-brand-mark">
+                <img src="{{ asset('assets/img/brand/cedar-logo-icon-trim.png') }}" alt="CedarGov icon">
+            </span>
+            <span>
+                <span class="es-brand-name d-block">CedarGov</span>
+                <span class="es-brand-sub">Lebanon Gov Portal</span>
+            </span>
         </a>
-        <a href="{{ route('office.appointments') }}" class="{{ request()->routeIs('office.appointments*') ? 'active':'' }}"><i class="bi bi-calendar-check"></i>Calendar</a>
-        <a href="{{ route('office.feedback') }}" class="{{ request()->routeIs('office.feedback*') ? 'active':'' }}"><i class="bi bi-star"></i>Reviews</a>
-    @else
-        <a href="{{ route('citizen.dashboard') }}" class="{{ request()->routeIs('citizen.dashboard') ? 'active':'' }}"><i class="bi bi-house-fill"></i>Home</a>
-        <a href="{{ route('citizen.offices') }}" class="{{ request()->routeIs('citizen.offices*') ? 'active':'' }}"><i class="bi bi-building"></i>Services</a>
-        <a href="{{ route('citizen.requests') }}" class="{{ request()->routeIs('citizen.requests*') ? 'active':'' }}"><i class="bi bi-file-text"></i>Requests</a>
-        <a href="{{ route('citizen.profile') }}" class="{{ request()->routeIs('citizen.profile*') ? 'active':'' }}"><i class="bi bi-person"></i>Profile</a>
-    @endif
-</nav>
-@endauth
 
-<div class="{{ auth()->check() ? 'main-wrap' : '' }}">
-    <div class="{{ auth()->check() ? 'main-pad' : '' }}">
+        {{-- Navigation --}}
+        <nav class="es-nav">
 
-        @if(session('success') || session('error') || session('info'))
+        @if(session('success') || session('error') || session('info') || session('warning'))
         <div id="__flash"
-             data-success="{{ session('success') }}"
-             data-error="{{ session('error') }}"
-             data-info="{{ session('info') }}"
-             style="display:none"></div>
+            data-success="{{ session('success') }}"
+            data-error="{{ session('error') }}"
+            data-info="{{ session('info') }}"
+            data-warning="{{ session('warning') }}"
+            style="display:none"></div>
         @endif
 
-        @if($errors->any())
-        <div class="alert alert-danger mb-3" role="alert">
-            <i class="bi bi-exclamation-circle-fill" style="flex-shrink:0"></i>
-            <div style="flex:1">@foreach($errors->all() as $e)<div>{{ $e }}</div>@endforeach</div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" style="flex-shrink:0"></button>
+            @if($user->isAdmin())
+                <span class="es-nav-section">Administration</span>
+
+                <a href="{{ route('admin.dashboard') }}"
+                   class="es-nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+                    <i class="bi bi-grid-1x2"></i>
+                    <span class="es-nav-label">Dashboard</span>
+                </a>
+                <a href="{{ route('admin.municipalities') }}"
+                   class="es-nav-link {{ request()->routeIs('admin.municipalities*') ? 'active' : '' }}">
+                    <i class="bi bi-map"></i>
+                    <span class="es-nav-label">Municipalities</span>
+                </a>
+                <a href="{{ route('admin.offices') }}"
+                   class="es-nav-link {{ request()->routeIs('admin.offices*') ? 'active' : '' }}">
+                    <i class="bi bi-buildings"></i>
+                    <span class="es-nav-label">Offices</span>
+                </a>
+                <a href="{{ route('admin.users') }}"
+                   class="es-nav-link {{ request()->routeIs('admin.users*') ? 'active' : '' }}">
+                    <i class="bi bi-people"></i>
+                    <span class="es-nav-label">Users</span>
+                </a>
+                <a href="{{ route('admin.reports') }}"
+                   class="es-nav-link {{ request()->routeIs('admin.reports*') ? 'active' : '' }}">
+                    <i class="bi bi-bar-chart-line"></i>
+                    <span class="es-nav-label">Reports</span>
+                </a>
+                <a href="{{ route('admin.support') }}"
+                   class="es-nav-link {{ request()->routeIs('admin.support*') ? 'active' : '' }}">
+                    <i class="bi bi-life-preserver"></i>
+                    <span class="es-nav-label">Support</span>
+                    @if($adminOpenTickets > 0)
+                        <span class="es-nav-badge">{{ $adminOpenTickets }}</span>
+                    @endif
+                </a>
+            @elseif($user->isOfficeUser())
+                <span class="es-nav-section">Office Panel</span>
+
+                <a href="{{ route('office.dashboard') }}"
+                   class="es-nav-link {{ request()->routeIs('office.dashboard') ? 'active' : '' }}">
+                    <i class="bi bi-grid-1x2"></i>
+                    <span class="es-nav-label">Dashboard</span>
+                </a>
+                <a href="{{ route('office.services') }}"
+                   class="es-nav-link {{ request()->routeIs('office.services*') ? 'active' : '' }}">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                    <span class="es-nav-label">Services</span>
+                </a>
+                <a href="{{ route('office.requests') }}"
+                   class="es-nav-link {{ request()->routeIs('office.requests*') ? 'active' : '' }}">
+                    <i class="bi bi-inbox"></i>
+                    <span class="es-nav-label">Requests</span>
+                    @if($pendingOfficeRequests > 0)
+                        <span class="es-nav-badge">{{ $pendingOfficeRequests }}</span>
+                    @endif
+                </a>
+                <a href="{{ route('office.appointments') }}"
+                   class="es-nav-link {{ request()->routeIs('office.appointments*') ? 'active' : '' }}">
+                    <i class="bi bi-calendar-check"></i>
+                    <span class="es-nav-label">Appointments</span>
+                </a>
+                <a href="{{ route('office.feedback') }}"
+                   class="es-nav-link {{ request()->routeIs('office.feedback*') ? 'active' : '' }}">
+                    <i class="bi bi-chat-left-text"></i>
+                    <span class="es-nav-label">Feedback</span>
+                </a>
+                <a href="{{ route('office.profile') }}"
+                   class="es-nav-link {{ request()->routeIs('office.profile*') ? 'active' : '' }}">
+                    <i class="bi bi-id-card"></i>
+                    <span class="es-nav-label">Profile</span>
+                </a>
+
+            @else
+                <span class="es-nav-section">{{ __('Citizen Portal') }}</span>
+
+                <a href="{{ route('citizen.dashboard') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.dashboard') ? 'active' : '' }}">
+                    <i class="bi bi-grid-1x2"></i>
+                    <span class="es-nav-label">{{ __('Dashboard') }}</span>
+                </a>
+                <a href="{{ route('citizen.offices') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.offices*') || request()->routeIs('citizen.services*') ? 'active' : '' }}">
+                    <i class="bi bi-search"></i>
+                    <span class="es-nav-label">{{ __('Browse Services') }}</span>
+                </a>
+                <a href="{{ route('citizen.requests') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.requests*') ? 'active' : '' }}">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <span class="es-nav-label">{{ __('My Requests') }}</span>
+                    @if($activeCitizenRequests > 0)
+                        <span class="es-nav-badge">{{ $activeCitizenRequests }}</span>
+                    @endif
+                </a>
+                <a href="{{ route('citizen.appointments') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.appointments') ? 'active' : '' }}">
+                    <i class="bi bi-calendar-event"></i>
+                    <span class="es-nav-label">{{ __('Appointments') }}</span>
+                </a>
+                <a href="{{ route('citizen.payments') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.payments') ? 'active' : '' }}">
+                    <i class="bi bi-credit-card"></i>
+                    <span class="es-nav-label">{{ __('Payments') }}</span>
+                </a>
+                <a href="{{ route('citizen.profile') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.profile*') ? 'active' : '' }}">
+                    <i class="bi bi-person"></i>
+                    <span class="es-nav-label">{{ __('Profile') }}</span>
+                </a>
+                <a href="{{ route('citizen.support') }}"
+                   class="es-nav-link {{ request()->routeIs('citizen.support*') ? 'active' : '' }}">
+                    <i class="bi bi-life-preserver"></i>
+                    <span class="es-nav-label">{{ __('Support') }}</span>
+                    @if($citizenSupportUnread > 0)
+                        <span class="es-nav-badge">{{ $citizenSupportUnread }}</span>
+                    @endif
+                </a>
+            @endif
+
+            {{-- Shared bottom links --}}
+            <span class="es-nav-section" style="margin-top:1.5rem;">{{ __('Account') }}</span>
+            <a href="{{ route('security.2fa') }}"
+               class="es-nav-link {{ request()->routeIs('security.2fa') ? 'active' : '' }}">
+                <i class="bi bi-shield-check"></i>
+                <span class="es-nav-label">{{ __('Security') }}</span>
+            </a>
+            <form action="{{ route('logout') }}" method="POST" class="m-0">
+                @csrf
+                <button type="submit" class="es-nav-link w-100 text-start border-0 bg-transparent"
+                        style="cursor:pointer; color:var(--es-muted);">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span class="es-nav-label">{{ __('Log Out') }}</span>
+                </button>
+            </form>
+
+        </nav>
+    </aside>
+    {{-- ── / Sidebar ─────────────────────────────────────────── --}}
+
+    {{-- ── Main ────────────────────────────────────────────────── --}}
+    <div class="es-main">
+
+        {{-- Topbar --}}
+        <header class="es-topbar">
+            <button class="es-topbar-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
+                <i class="bi bi-list"></i>
+            </button>
+
+            <h1 class="es-topbar-title">@yield('page-title', 'Dashboard')</h1>
+
+            <div class="es-topbar-right">
+
+                @if($user->isAdmin())
+                <button
+                    class="es-topbar-btn"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#adminQuickActionsModal"
+                    aria-label="{{ __('Quick actions') }}"
+                    title="{{ __('Quick actions') }} (Ctrl/Cmd + K)">
+                    <i class="bi bi-lightning-charge"></i>
+                </button>
+                @endif
+
+                {{-- Language switcher — citizens only --}}
+                @if($user->isCitizen())
+                <div class="dropdown">
+                    <button class="es-topbar-btn" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            aria-label="{{ __('Language') }}" title="{{ __('Language') }}">
+                        <span style="font-size:.78rem; font-weight:700;">{{ strtoupper(app()->getLocale()) }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width:140px;">
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center gap-2 {{ app()->getLocale() === 'en' ? 'fw-bold' : '' }}"
+                               href="{{ route('locale.switch', 'en') }}">
+                                <span style="font-size:.72rem; color:var(--es-muted);">EN</span>
+                                {{ __('English') }}
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center gap-2 {{ app()->getLocale() === 'ar' ? 'fw-bold' : '' }}"
+                               href="{{ route('locale.switch', 'ar') }}">
+                                <span style="font-size:.72rem; color:var(--es-muted);">AR</span>
+                                {{ __('Arabic') }}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                @endif
+
+                {{-- Notifications --}}
+                <div class="dropdown">
+                    <button id="notificationBell" class="es-topbar-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ __('Notifications') }}">
+                        <i class="bi bi-bell"></i>
+                        @if($unreadCount > 0)
+                            <span class="es-notif-dot"></span>
+                        @endif
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" style="width:310px; max-height:380px; overflow-y:auto; padding:.5rem 0;">
+                        <li>
+                            <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom" style="border-color:var(--es-border)!important;">
+                                <span style="font-size:.82rem; font-weight:700; color:var(--es-text);">{{ __('Notifications') }}</span>
+                                @if($unreadCount > 0)
+                                    <span class="badge rounded-pill" style="background:var(--es-primary-s); color:var(--es-primary); font-size:.65rem;">{{ $unreadCount }} new</span>
+                                @endif
+                            </div>
+                        </li>
+                        @forelse($user->unreadNotifications->take(6) as $notification)
+                            <li>
+                                <div class="dropdown-item py-2" style="border-radius:0;">
+                                    <div style="font-size:.82rem; font-weight:600; color:var(--es-text); line-height:1.4;">
+                                        {{ $notification->data['message'] ?? 'New notification' }}
+                                    </div>
+                                    <div style="font-size:.72rem; color:var(--es-muted); margin-top:.2rem;">
+                                        {{ $notification->created_at->diffForHumans() }}
+                                    </div>
+                                </div>
+                            </li>
+                        @empty
+                            <li>
+                                <div class="text-center py-4" style="color:var(--es-muted); font-size:.84rem;">
+                                    <i class="bi bi-bell-slash d-block mb-1" style="font-size:1.5rem; opacity:.4;"></i>
+                                    {{ __('No new notifications') }}
+                                </div>
+                            </li>
+                        @endforelse
+                    </ul>
+                </div>
+
+                {{-- User menu --}}
+                <div class="dropdown ms-1">
+                    @if($user->avatar_url)
+                        <img src="{{ $user->avatar_url }}" alt="{{ $user->name }}" class="es-avatar" data-bs-toggle="dropdown" role="button" aria-expanded="false" style="object-fit:cover;" referrerpolicy="no-referrer">
+                    @else
+                        <div class="es-avatar" data-bs-toggle="dropdown" role="button" aria-expanded="false">
+                            {{ strtoupper(substr($user->name, 0, 1)) }}
+                        </div>
+                    @endif
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width:210px;">
+                        <li>
+                            <div class="px-3 py-2 border-bottom" style="border-color:var(--es-border)!important;">
+                                <div style="font-size:.875rem; font-weight:700; color:var(--es-text);">{{ $user->name }}</div>
+                                <div style="font-size:.72rem; color:var(--es-muted);">{{ ucfirst(str_replace('_', ' ', $user->role)) }}</div>
+                            </div>
+                        </li>
+                        @if($user->isCitizen())
+                            <li><a class="dropdown-item mt-1" href="{{ route('citizen.profile') }}">
+                                <i class="bi bi-person me-2" style="color:var(--es-muted);"></i>{{ __('Profile') }}
+                            </a></li>
+                        @elseif($user->isOfficeUser())
+                            <li><a class="dropdown-item mt-1" href="{{ route('office.profile') }}">
+                                <i class="bi bi-id-card me-2" style="color:var(--es-muted);"></i>{{ __('Profile') }}
+                            </a></li>
+                        @endif
+                        <li><a class="dropdown-item" href="{{ route('security.2fa') }}">
+                            <i class="bi bi-shield-check me-2" style="color:var(--es-muted);"></i>{{ __('Security') }}
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form action="{{ route('logout') }}" method="POST" class="m-0">
+                                @csrf
+                                <button class="dropdown-item text-danger" type="submit">
+                                    <i class="bi bi-box-arrow-right me-2"></i>{{ __('Log Out') }}
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+        </header>
+        {{-- / Topbar --}}
+
+        {{-- Content --}}
+        <main class="es-content">
+
+            {{-- Breadcrumb --}}
+            @php $segments = request()->segments(); @endphp
+            @if(count($segments) > 1)
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ $baseHome }}">{{ __('Home') }}</a></li>
+                    @foreach($segments as $i => $segment)
+                        @php
+                            $label = ucfirst(str_replace('-', ' ', $segment));
+                            $isLast = ($i === count($segments) - 1);
+                        @endphp
+                        @if($isLast)
+                            <li class="breadcrumb-item active">{{ $label }}</li>
+                        @else
+                            <li class="breadcrumb-item">{{ $label }}</li>
+                        @endif
+                    @endforeach
+                </ol>
+            </nav>
+            @endif
+
+            @if($user->hasVerifiedEmail() === false && !request()->routeIs('verification.notice'))
+                <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" style="font-size:.85rem;">
+                    <i class="bi bi-envelope-exclamation"></i>
+                    <span class="flex-fill">
+                        Please verify your email address. We sent a link to <strong>{{ $user->email }}</strong>.
+                    </span>
+                    <form method="POST" action="{{ route('verification.send') }}" class="m-0">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-outline-warning">Resend</button>
+                    </form>
+                </div>
+            @endif
+
+            {{-- Validation errors render inline; success/error/info/warning render as toasts --}}
+            @if($errors->any())
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <ul class="mb-0 ps-3 mt-1">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            @endif
+
+            {{-- Page content --}}
+            @yield('content')
+
+        </main>
+
+        @stack('modals')
+
+        {{-- Footer --}}
+        <footer class="es-footer">
+            &copy; {{ now()->year }} CedarGov Platform &mdash; Lebanese Municipalities
+        </footer>
+
+    </div>
+    {{-- ── / Main ───────────────────────────────────────────────── --}}
+
+</div>
+
+@if($user->isAdmin())
+<div class="modal fade admin-quick-modal" id="adminQuickActionsModal" tabindex="-1" aria-labelledby="adminQuickActionsTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="border:none;padding:1.05rem 1.2rem .35rem;">
+                <h6 class="modal-title" id="adminQuickActionsTitle" style="font-weight:700;color:#566A7F;">
+                    Quick Actions
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:.7rem 1.2rem 1.1rem;">
+                <div class="admin-quick-grid">
+                    <a class="admin-quick-link" href="{{ route('admin.users', ['quick' => 'add']) }}">
+                        <i class="bi bi-person-plus"></i> Create Office User
+                        <span class="admin-quick-key">Users</span>
+                    </a>
+                    <a class="admin-quick-link" href="{{ route('admin.offices', ['quick' => 'add']) }}">
+                        <i class="bi bi-building-add"></i> Add Office
+                        <span class="admin-quick-key">Offices</span>
+                    </a>
+                    <a class="admin-quick-link" href="{{ route('admin.municipalities', ['quick' => 'add']) }}">
+                        <i class="bi bi-pin-map"></i> Add Municipality
+                        <span class="admin-quick-key">Municipalities</span>
+                    </a>
+                    <a class="admin-quick-link" href="{{ route('admin.reports') }}">
+                        <i class="bi bi-graph-up-arrow"></i> Open Reports
+                        <span class="admin-quick-key">Analytics</span>
+                    </a>
+                </div>
+            </div>
         </div>
-        @endif
-
-        @yield('content')
     </div>
 </div>
+@endif
 
-<div class="toast-stack" id="toastStack"></div>
+@if(auth()->check() && auth()->user()->isCitizen() && filled(config('services.groq.api_key')))
+    @include('partials.chatbot-widget')
+@endif
 
-{{-- Session expiry warning --}}
-@auth
-<div id="session-warn" style="display:none;position:fixed;top:56px;left:var(--sb-w);right:0;background:var(--amber-lt);border-bottom:2px solid var(--amber);padding:.5rem 1.25rem;z-index:999;align-items:center;gap:.6rem;font-size:.8rem;color:#92400E">
-    <i class="bi bi-clock-history" style="flex-shrink:0"></i>
-    <span>Your session expires in <strong id="session-countdown">5:00</strong>. <a href="javascript:location.reload()" style="color:inherit;font-weight:700">Refresh now</a></span>
-    <button onclick="document.getElementById('session-warn').style.display='none'" style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:1rem">&times;</button>
-</div>
 @endauth
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+@guest
+    @yield('content')
+@endguest
+
+{{-- Bootstrap JS --}}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+{{-- Sidebar toggle --}}
 <script>
-(function(){
-    'use strict';
+const __mqMobile = window.matchMedia('(max-width: 991.98px)');
 
-    /* Sidebar */
-    const sb=document.getElementById('sidebar'),ov=document.getElementById('sbOverlay'),btn=document.getElementById('menuBtn');
-    const openSb=()=>{sb?.classList.add('open');ov?.classList.add('show');document.body.style.overflow='hidden'};
-    const closeSb=()=>{sb?.classList.remove('open');ov?.classList.remove('show');document.body.style.overflow=''};
-    btn?.addEventListener('click',()=>sb?.classList.contains('open')?closeSb():openSb());
-    ov?.addEventListener('click',closeSb);
-    sb?.querySelectorAll('.nav-link').forEach(l=>l.addEventListener('click',()=>{if(window.innerWidth<992)closeSb()}));
+function toggleSidebar() {
+    const open = document.getElementById('esSidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('open', open);
+    document.body.classList.toggle('es-sidebar-open', open);
+}
+function closeSidebar() {
+    document.getElementById('esSidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
+    document.body.classList.remove('es-sidebar-open');
+}
+__mqMobile.addEventListener('change', e => { if (!e.matches) closeSidebar(); });
 
-    /* Swipe */
-    let tx=0,ty=0,drag=false;
-    document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;drag=false},{passive:true});
-    document.addEventListener('touchmove',e=>{if(Math.abs(e.touches[0].clientX-tx)>Math.abs(e.touches[0].clientY-ty))drag=true},{passive:true});
-    document.addEventListener('touchend',e=>{
-        if(!drag)return;
-        const dx=e.changedTouches[0].clientX-tx;
-        if(tx<28&&dx>65)openSb();
-        if(dx<-55&&sb?.classList.contains('open'))closeSb();
-    },{passive:true});
-
+/* ── Global UX: toasts, flash messages, sidebar swipe (runs for all roles) ── */
+(function () {
     /* Toasts */
-    const ts=document.getElementById('toastStack');
-    const icons={success:'bi-check-circle-fill',error:'bi-x-circle-fill',info:'bi-info-circle-fill',warning:'bi-exclamation-triangle-fill'};
-    window.showToast=function(msg,type,dur){
-        if(!msg||!ts)return;
-        type=type||'info';dur=dur||4500;
-        const t=document.createElement('div');
-        t.className=`toast-item ${type}`;
-        t.innerHTML=`<i class="bi ${icons[type]||icons.info}" style="font-size:.9rem;flex-shrink:0"></i><span style="flex:1">${msg}</span><button onclick="window.closeToast(this.parentElement)" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:1.1rem;padding:0;line-height:1">&times;</button>`;
-        ts.appendChild(t);
-        setTimeout(()=>window.closeToast(t),dur);
+    const ts = document.getElementById('toastStack');
+    const icons = {
+        success: 'bi-check-circle-fill',
+        error:   'bi-x-circle-fill',
+        info:    'bi-info-circle-fill',
+        warning: 'bi-exclamation-triangle-fill',
     };
-    window.closeToast=function(el){
-        if(!el||!el.parentElement)return;
+    window.showToast = function (msg, type, dur) {
+        if (!msg || !ts) return;
+        type = type || 'info';
+        dur = dur || 4500;
+        const t = document.createElement('div');
+        t.className = `toast-item ${type}`;
+        const icon = document.createElement('i');
+        icon.className = `bi ${icons[type] || icons.info}`;
+        icon.style.cssText = 'font-size:1rem;flex-shrink:0;line-height:1.45';
+        const span = document.createElement('span');
+        span.style.flex = '1';
+        span.textContent = msg;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('aria-label', 'Dismiss');
+        btn.style.cssText = 'background:none;border:none;color:rgba(255,255,255,.55);cursor:pointer;font-size:1.1rem;padding:0;line-height:1';
+        btn.innerHTML = '&times;';
+        btn.addEventListener('click', () => window.closeToast(t));
+        t.appendChild(icon); t.appendChild(span); t.appendChild(btn);
+        ts.appendChild(t);
+        setTimeout(() => window.closeToast(t), dur);
+    };
+    window.closeToast = function (el) {
+        if (!el || !el.parentElement) return;
         el.classList.add('out');
-        el.addEventListener('animationend',()=>el.remove(),{once:true});
+        el.addEventListener('animationend', () => el.remove(), { once: true });
     };
 
-    /* Flash messages */
-    const fd=document.getElementById('__flash');
-    if(fd){
-        if(fd.dataset.success)setTimeout(()=>showToast(fd.dataset.success,'success'),200);
-        if(fd.dataset.error)  setTimeout(()=>showToast(fd.dataset.error,  'error'),  200);
-        if(fd.dataset.info)   setTimeout(()=>showToast(fd.dataset.info,   'info'),   200);
+    /* Flash messages → toasts */
+    const fd = document.getElementById('__flash');
+    if (fd) {
+        if (fd.dataset.success) setTimeout(() => showToast(fd.dataset.success, 'success'), 200);
+        if (fd.dataset.error)   setTimeout(() => showToast(fd.dataset.error,   'error'),   200);
+        if (fd.dataset.info)    setTimeout(() => showToast(fd.dataset.info,    'info'),    200);
+        if (fd.dataset.warning) setTimeout(() => showToast(fd.dataset.warning, 'warning'), 200);
     }
+
+    /* Sidebar swipe — mobile only */
+    const sb = document.getElementById('esSidebar');
+    if (sb) {
+        let tx = 0, ty = 0, drag = false;
+        document.addEventListener('touchstart', e => {
+            if (!__mqMobile.matches) return;
+            tx = e.touches[0].clientX; ty = e.touches[0].clientY; drag = false;
+        }, { passive: true });
+        document.addEventListener('touchmove', e => {
+            if (!__mqMobile.matches) return;
+            if (Math.abs(e.touches[0].clientX - tx) > Math.abs(e.touches[0].clientY - ty)) drag = true;
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            if (!__mqMobile.matches || !drag) return;
+            const dx = e.changedTouches[0].clientX - tx;
+            if (tx < 28 && dx > 65) toggleSidebar();
+            else if (dx < -55 && sb.classList.contains('open')) closeSidebar();
+        }, { passive: true });
+    }
+
+    /* Escape closes mobile sidebar */
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.body.classList.contains('es-sidebar-open')) closeSidebar();
+    });
+})();
+
+(function () {
+    const body = document.body;
+    if (!body.classList.contains('es-role-admin')) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const content = document.querySelector('.es-content');
+    if (content && !prefersReducedMotion) {
+        body.classList.add('admin-motion-ready');
+        const revealItems = Array.from(content.children);
+        revealItems.forEach((el, index) => {
+            el.style.animationDelay = `${Math.min(index * 45, 220)}ms`;
+        });
+    }
+
+    @auth
+        function addRealtimeNotification(message, url = '#') {
+            const bellBtn = document.getElementById('notificationBell');
+            const dropdownMenu = bellBtn?.nextElementSibling;
+            const unreadBadge = bellBtn?.querySelector('.top-dot');
+            const headerCount = dropdownMenu?.querySelector('.dropdown-header span');
+
+            if (!unreadBadge && bellBtn) {
+                const badge = document.createElement('span');
+                badge.className = 'top-dot';
+                badge.textContent = '1';
+                bellBtn.appendChild(badge);
+            } else if (unreadBadge) {
+                const current = parseInt(unreadBadge.textContent || '0', 10);
+                unreadBadge.textContent = String(Math.min(current + 1, 9));
+            }
+
+            if (headerCount) {
+                const currentHeader = parseInt(headerCount.textContent || '0', 10) || 0;
+                headerCount.textContent = `${currentHeader + 1} new`;
+            }
+
+            const emptyState = dropdownMenu?.querySelector('.bi-bell-slash')?.closest('div');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const newItem = document.createElement('a');
+            newItem.className = 'dropdown-item';
+            newItem.href = url;
+            newItem.style.whiteSpace = 'normal';
+            newItem.innerHTML = `
+                <div style="display:flex;gap:.45rem">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:5px"></span>
+                    <div>
+                        <div style="font-size:.78rem;line-height:1.45;color:var(--ink-600)">${message}</div>
+                        <div style="font-size:.65rem;color:var(--ink-400);margin-top:1px">Just now</div>
+                    </div>
+                </div>
+            `;
+
+            const header = dropdownMenu?.querySelector('.dropdown-header');
+            if (header && header.nextSibling) {
+                dropdownMenu.insertBefore(newItem, header.nextSibling);
+            } else if (dropdownMenu) {
+                dropdownMenu.appendChild(newItem);
+            }
+
+            showToast(message, 'info');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.Echo) {
+                console.error('Echo is not loaded');
+                return;
+            }
+
+            window.Echo.private('user.{{ auth()->id() }}')
+                .listen('.request.status.updated', (e) => {
+                    const statusText = String(e.new_status || '').replaceAll('_', ' ');
+                    const message = `Your request #${e.reference_number} status changed to ${statusText}.`;
+                    const url = `{{ auth()->user()->isOfficeUser() ? url('/office/requests') : url('/citizen/requests') }}/${e.request_id}`;
+                    addRealtimeNotification(message, url);
+                })
+                .listen('.appointment.reminder', (e) => {
+                    const url = e.service_request_id
+                        ? `{{ auth()->user()->isOfficeUser() ? url('/office/requests') : url('/citizen/requests') }}/${e.service_request_id}`
+                        : `{{ auth()->user()->isOfficeUser() ? url('/office/dashboard') : url('/citizen/offices') }}/${e.office_id}`;
+
+                    addRealtimeNotification(e.message || 'Appointment reminder', url);
+                })
+                .listen('.message.sent', (e) => {
+                    if (e.sender_id === {{ auth()->id() }}) {
+                        return;
+                    }
+
+                    const url = `{{ auth()->user()->isOfficeUser() ? url('/office/requests') : url('/citizen/requests') }}/${e.service_request_id}`;
+                    const senderName = e.sender?.name || 'Someone';
+                    addRealtimeNotification(`New message from ${senderName}.`, url);
+                });
+
+            @if(auth()->user()->isOfficeUser() && auth()->user()->offices()->first())
+            window.Echo.private('office.{{ auth()->user()->offices()->first()->id }}')
+                .listen('.message.sent', (e) => {
+                    if (e.sender_id === {{ auth()->id() }}) {
+                        return;
+                    }
+
+                    const url = `{{ url('/office/requests') }}/${e.service_request_id}`;
+                    const senderName = e.sender?.name || 'Citizen';
+                    addRealtimeNotification(`New message from ${senderName}.`, url);
+                });
+            @endif
+
+            const bellBtn = document.getElementById('notificationBell');
+
+            bellBtn?.addEventListener('shown.bs.dropdown', async () => {
+                try {
+                    await fetch('{{ route('notifications.readAll') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json',
+                        }
+                    });
+
+                    bellBtn.querySelector('.top-dot')?.remove();
+
+                    const dropdownMenu = bellBtn.nextElementSibling;
+                    const headerCount = dropdownMenu?.querySelector('.dropdown-header span');
+                    if (headerCount) {
+                        headerCount.remove();
+                    }
+                } catch (error) {
+                    console.error('Failed to mark notifications as read');
+                }
+            });
+        });
+    @endauth
 
     /* Session expiry countdown + history lock for authenticated pages */
     @auth
@@ -537,40 +2505,610 @@
             }
         });
     }
-
-    // Intercept Alt+Left / Alt+Right and keep user in the app dashboard.
-    document.addEventListener('keydown',(e)=>{
-        if(e.altKey && (e.key==='ArrowLeft' || e.key==='ArrowRight')){
-            e.preventDefault();
-            window.location.replace(ROLE_HOME_URL);
-        }
-    });
-
-    // If browser restores from BFCache, force fresh state from server.
-    window.addEventListener('pageshow',(e)=>{
-        if(e.persisted){
-            window.location.replace(ROLE_HOME_URL);
-        }
-    });
-
-    const SESSION_SECS={{ config('session.lifetime',120) }}*60;
-    const startedAt=Date.now();
-    let warned=false;
-    function checkSession(){
-        const elapsed=Math.floor((Date.now()-startedAt)/1000);
-        const remaining=SESSION_SECS-elapsed;
-        if(remaining<=0){window.location.href='{{ route("login") }}';return}
-        if(remaining<=300){
-            const warn=document.getElementById('session-warn');
-            if(!warned&&warn){warned=true;warn.style.display='flex'}
-            const cd=document.getElementById('session-countdown');
-            if(cd){const m=Math.floor(remaining/60),s=String(remaining%60).padStart(2,'0');cd.textContent=`${m}:${s}`}
-        }
-    }
-    setInterval(checkSession,1000);
     @endauth
+
+    const parseCellValue = (text, type) => {
+        const raw = String(text ?? '').trim();
+        if (type === 'number') {
+            const parsed = Number(raw.replace(/[^0-9.-]+/g, ''));
+            return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+        }
+        if (type === 'date') {
+            const parsed = Date.parse(raw);
+            return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+        }
+        return raw.toLowerCase();
+    };
+
+    const tableStoragePrefix = 'admin_table_state_v1_';
+    const safeReadStorage = (key) => {
+        try {
+            const raw = window.localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    };
+    const safeWriteStorage = (key, value) => {
+        try {
+            window.localStorage.setItem(key, JSON.stringify(value));
+        } catch {
+            // Ignore storage failures.
+        }
+    };
+    const getTableKey = (table, selectorHint = null) => {
+        if (!table) return null;
+        if (table.dataset.adminTableKey) return table.dataset.adminTableKey;
+        if (table.id) return table.id;
+        if (selectorHint) return selectorHint;
+        return `table-${Array.from(document.querySelectorAll('table[data-admin-table]')).indexOf(table)}`;
+    };
+    const readTableState = (tableKey) => safeReadStorage(`${tableStoragePrefix}${tableKey}`);
+    const writeTableState = (tableKey, patch) => {
+        const current = readTableState(tableKey);
+        safeWriteStorage(`${tableStoragePrefix}${tableKey}`, { ...current, ...patch });
+    };
+
+    const sortTableByColumn = (table, columnIndex, sortType, direction) => {
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort((a, b) => {
+            const aCell = a.children[columnIndex];
+            const bCell = b.children[columnIndex];
+            const aRaw = aCell ? (aCell.dataset.sortValue ?? aCell.innerText) : '';
+            const bRaw = bCell ? (bCell.dataset.sortValue ?? bCell.innerText) : '';
+            const aValue = parseCellValue(aRaw, sortType);
+            const bValue = parseCellValue(bRaw, sortType);
+
+            if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach((row) => tbody.appendChild(row));
+    };
+
+    const initSortableTables = (root) => {
+        root.querySelectorAll('table[data-admin-table]').forEach((table) => {
+            if (table.dataset.sortBound === '1') return;
+            table.dataset.sortBound = '1';
+
+            const tableKey = getTableKey(table);
+            const savedState = tableKey ? readTableState(tableKey) : {};
+            const headers = Array.from(table.querySelectorAll('thead th[data-sort]'));
+            const applySort = (header, direction) => {
+                if (!header) return;
+                const columnIndex = Number(header.dataset.sort);
+                const sortType = header.dataset.sortType || 'text';
+
+                headers.forEach((th) => th.classList.remove('is-asc', 'is-desc'));
+                header.classList.add(direction === 'asc' ? 'is-asc' : 'is-desc');
+
+                table.dataset.sortIndex = String(columnIndex);
+                table.dataset.sortDir = direction;
+                sortTableByColumn(table, columnIndex, sortType, direction);
+
+                if (tableKey) {
+                    writeTableState(tableKey, { sortIndex: columnIndex, sortDir: direction });
+                }
+            };
+
+            headers.forEach((header) => {
+                header.addEventListener('click', () => {
+                    const isCurrent = table.dataset.sortIndex === header.dataset.sort;
+                    const nextDirection = isCurrent && table.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+                    applySort(header, nextDirection);
+                });
+            });
+
+            const savedHeader = headers.find((th) => Number(th.dataset.sort) === Number(savedState.sortIndex));
+            if (savedHeader && (savedState.sortDir === 'asc' || savedState.sortDir === 'desc')) {
+                applySort(savedHeader, savedState.sortDir);
+            }
+        });
+    };
+
+    const initDensitySwitches = (root) => {
+        root.querySelectorAll('.admin-density-switch').forEach((switchWrap) => {
+            const buttons = Array.from(switchWrap.querySelectorAll('[data-admin-density-target]'));
+            if (!buttons.length) return;
+
+            const getTable = () => {
+                const selector = buttons[0].dataset.adminDensityTarget;
+                return selector ? document.querySelector(selector) : null;
+            };
+            const table = getTable();
+            const tableKey = getTableKey(table, buttons[0].dataset.adminDensityTarget || null);
+            const savedState = tableKey ? readTableState(tableKey) : {};
+
+            const applyDensity = (density) => {
+                const targetTable = getTable();
+                if (!targetTable) return;
+                targetTable.classList.toggle('admin-table-compact', density === 'compact');
+                buttons.forEach((btn) => {
+                    btn.classList.toggle('is-active', (btn.dataset.adminDensity || 'comfortable') === density);
+                });
+                if (tableKey) {
+                    writeTableState(tableKey, { density });
+                }
+            };
+
+            buttons.forEach((button) => {
+                if (button.dataset.densityBound === '1') return;
+                button.dataset.densityBound = '1';
+
+                button.addEventListener('click', () => {
+                    applyDensity(button.dataset.adminDensity || 'comfortable');
+                });
+            });
+
+            const initialDensity = (savedState.density === 'compact' || savedState.density === 'comfortable')
+                ? savedState.density
+                : (buttons.find((btn) => btn.classList.contains('is-active'))?.dataset.adminDensity || 'comfortable');
+            applyDensity(initialDensity);
+        });
+    };
+
+    const initChipFilters = (root) => {
+        root.querySelectorAll('[data-admin-filter-group]').forEach((group) => {
+            const buttons = Array.from(group.querySelectorAll('[data-admin-table-filter]'));
+            if (!buttons.length) return;
+
+            const selector = buttons[0].dataset.adminTableFilterTarget;
+            const field = buttons[0].dataset.adminFilterField;
+            if (!selector || !field) return;
+
+            const table = document.querySelector(selector);
+            const tbody = table?.querySelector('tbody');
+            if (!tbody) return;
+
+            const tableKey = getTableKey(table, selector);
+            const savedState = tableKey ? readTableState(tableKey) : {};
+            let currentFilters = savedState.filters || {};
+
+            const applyFilter = (button) => {
+                const value = (button.dataset.adminFilterValue || 'all').toLowerCase();
+                tbody.querySelectorAll('tr').forEach((row) => {
+                    const rowValue = String(row.dataset[field] || '').toLowerCase();
+                    row.style.display = value === 'all' || rowValue === value ? '' : 'none';
+                });
+
+                buttons.forEach((btn) => {
+                    btn.classList.toggle('is-active', btn === button);
+                });
+
+                if (tableKey) {
+                    const nextFilters = { ...currentFilters, [field]: value };
+                    currentFilters = nextFilters;
+                    writeTableState(tableKey, { filters: nextFilters });
+                }
+            };
+
+            buttons.forEach((button) => {
+                if (button.dataset.filterBound === '1') return;
+                button.dataset.filterBound = '1';
+                button.addEventListener('click', () => applyFilter(button));
+            });
+
+            const initialValue = typeof currentFilters[field] === 'string' ? currentFilters[field] : null;
+            const initialButton = buttons.find((btn) => (btn.dataset.adminFilterValue || 'all').toLowerCase() === initialValue)
+                || buttons.find((btn) => btn.classList.contains('is-active'))
+                || buttons[0];
+            applyFilter(initialButton);
+        });
+    };
+
+    const initBusyTargets = (root) => {
+        root.querySelectorAll('form[data-admin-busy-target]').forEach((form) => {
+            if (form.dataset.busyBound === '1') return;
+            form.dataset.busyBound = '1';
+
+            form.addEventListener('submit', (event) => {
+                if (event.defaultPrevented) return;
+                const selector = form.dataset.adminBusyTarget;
+                if (!selector) return;
+                const target = document.querySelector(selector);
+                target?.classList.add('admin-is-busy');
+            });
+        });
+
+        root.querySelectorAll('a[data-admin-busy-target]').forEach((link) => {
+            if (link.dataset.busyBound === '1') return;
+            link.dataset.busyBound = '1';
+
+            link.addEventListener('click', (event) => {
+                if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                const selector = link.dataset.adminBusyTarget;
+                if (!selector) return;
+                const target = document.querySelector(selector);
+                target?.classList.add('admin-is-busy');
+            });
+        });
+
+        root.querySelectorAll('.admin-busy-target .pagination a').forEach((link) => {
+            if (link.dataset.paginationBusyBound === '1') return;
+            link.dataset.paginationBusyBound = '1';
+
+            link.addEventListener('click', (event) => {
+                if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                const target = link.closest('.admin-busy-target');
+                target?.classList.add('admin-is-busy');
+            });
+        });
+    };
+
+    const initDirtyModalForms = (root) => {
+        root.querySelectorAll('.modal form').forEach((form) => {
+            if (form.dataset.dirtyBound === '1') return;
+            form.dataset.dirtyBound = '1';
+
+            const modalEl = form.closest('.modal');
+            let snapshot = '';
+            let submitting = false;
+
+            const makeSnapshot = () => new URLSearchParams(new FormData(form)).toString();
+            const refreshDirtyState = () => {
+                if (submitting) return;
+                form.dataset.formDirty = makeSnapshot() !== snapshot ? '1' : '0';
+            };
+            const resetState = () => {
+                submitting = false;
+                snapshot = makeSnapshot();
+                form.dataset.formDirty = '0';
+            };
+
+            form.addEventListener('input', refreshDirtyState);
+            form.addEventListener('change', refreshDirtyState);
+            form.addEventListener('submit', () => {
+                submitting = true;
+                form.dataset.formDirty = '0';
+            });
+
+            if (modalEl) {
+                modalEl.addEventListener('show.bs.modal', () => {
+                    resetState();
+                });
+                modalEl.addEventListener('hidden.bs.modal', () => {
+                    resetState();
+                });
+                modalEl.addEventListener('hide.bs.modal', (event) => {
+                    if (submitting || form.dataset.formDirty !== '1') return;
+                    const shouldDiscard = window.confirm('Discard unsaved changes?');
+                    if (!shouldDiscard) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                    }
+                });
+            } else {
+                resetState();
+            }
+        });
+
+        if (!window.__adminDirtyBeforeUnloadBound) {
+            window.__adminDirtyBeforeUnloadBound = true;
+            window.addEventListener('beforeunload', (event) => {
+                const hasDirtyForm = document.querySelector('.modal form[data-form-dirty="1"]');
+                if (!hasDirtyForm) return;
+                event.preventDefault();
+                event.returnValue = '';
+            });
+        }
+    };
+
+    const revealObserver = !prefersReducedMotion && 'IntersectionObserver' in window
+        ? new IntersectionObserver((entries, observer) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+            });
+        }, { threshold: 0.12 })
+        : null;
+
+    const initReveals = (root) => {
+        root.querySelectorAll('.admin-reveal').forEach((el, index) => {
+            if (el.dataset.revealBound === '1') return;
+            el.dataset.revealBound = '1';
+            el.style.transitionDelay = `${Math.min(index * 60, 360)}ms`;
+
+            if (prefersReducedMotion || !revealObserver) {
+                el.classList.add('is-visible');
+            } else {
+                revealObserver.observe(el);
+            }
+        });
+    };
+
+    /* ── Admin topbar scroll shadow ── */
+    const initAdminTopbar = () => {
+        const topbar = document.querySelector('.es-topbar');
+        if (!topbar || topbar.dataset.adminScrollBound === '1') return;
+        topbar.dataset.adminScrollBound = '1';
+        let ticking = false;
+        const sync = () => { topbar.classList.toggle('is-scrolled', window.scrollY > 6); ticking = false; };
+        sync();
+        window.addEventListener('scroll', () => {
+            if (!ticking) { ticking = true; requestAnimationFrame(sync); }
+        }, { passive: true });
+    };
+
+    /* ── Admin KPI card tilt ── */
+    const initAdminTilt = (root) => {
+        if (prefersReducedMotion) return;
+        root.querySelectorAll('.admin-kpi-card').forEach((card) => {
+            if (card.dataset.adminTiltBound === '1') return;
+            card.dataset.adminTiltBound = '1';
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
+                card.style.transform = `perspective(600px) rotateY(${x * 4}deg) rotateX(${-y * 4}deg) translateY(-3px)`;
+            });
+            card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+        });
+    };
+
+    window.initAdminGlobalUX = function initAdminGlobalUX(root = document) {
+        initSortableTables(root);
+        initDensitySwitches(root);
+        initChipFilters(root);
+        initBusyTargets(root);
+        initDirtyModalForms(root);
+        initReveals(root);
+        initAdminTopbar();
+        initAdminTilt(root);
+    };
+
+    window.initAdminGlobalUX(document);
+
+    const openQuickActions = () => {
+        const modalEl = document.getElementById('adminQuickActionsModal');
+        if (!modalEl || typeof bootstrap === 'undefined') return;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    };
+
+    document.addEventListener('keydown', (event) => {
+        if (!body.classList.contains('es-role-admin')) return;
+        if (!(event.ctrlKey || event.metaKey)) return;
+        if (event.shiftKey || event.altKey) return;
+        if (event.key.toLowerCase() !== 'k') return;
+        event.preventDefault();
+        openQuickActions();
+    });
+})();
+
+(function () {
+    const body = document.body;
+    if (!body.classList.contains('es-role-citizen')) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ── Topbar scroll state ── */
+    const topbar = document.querySelector('.es-topbar');
+    if (topbar) {
+        let ticking = false;
+        const syncTopbarState = () => {
+            topbar.classList.toggle('is-scrolled', window.scrollY > 6);
+            ticking = false;
+        };
+        syncTopbarState();
+        window.addEventListener('scroll', () => {
+            if (!ticking) { ticking = true; requestAnimationFrame(syncTopbarState); }
+        }, { passive: true });
+    }
+
+    /* ── Smooth elastic counter animation ── */
+    const animateCounter = (el) => {
+        if (!el || el.dataset.counterAnimated === '1') return;
+        el.dataset.counterAnimated = '1';
+
+        const target = Number(el.dataset.citizenCounter || el.textContent || 0);
+        if (!Number.isFinite(target)) return;
+
+        if (prefersReducedMotion) {
+            el.textContent = String(Math.round(target));
+            return;
+        }
+
+        const duration = 1000;
+        const startTime = performance.now();
+        /* Elastic ease-out for a satisfying bounce */
+        const elasticOut = (t) => {
+            if (t === 0 || t === 1) return t;
+            return Math.pow(2, -10 * t) * Math.sin((t - 0.075) * (2 * Math.PI) / 0.3) + 1;
+        };
+
+        const step = (now) => {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased = elasticOut(progress);
+            el.textContent = String(Math.round(target * eased));
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            } else {
+                el.textContent = String(Math.round(target));
+            }
+        };
+
+        requestAnimationFrame(step);
+    };
+
+    /* ── Intersection observer for reveals + counters ── */
+    const revealObserver = !prefersReducedMotion && 'IntersectionObserver' in window
+        ? new IntersectionObserver((entries, observer) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                if (entry.target.matches('[data-citizen-counter]')) {
+                    animateCounter(entry.target);
+                }
+                observer.unobserve(entry.target);
+            });
+        }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' })
+        : null;
+
+    /* ── Global UX initializer ── */
+    window.initCitizenGlobalUX = function initCitizenGlobalUX(root = document) {
+        const revealItems = root.querySelectorAll('.citizen-reveal, [data-citizen-reveal]');
+        revealItems.forEach((el, index) => {
+            if (el.dataset.citizenRevealBound === '1') return;
+            el.dataset.citizenRevealBound = '1';
+            /* Stagger: 60ms per item, max 360ms */
+            el.style.transitionDelay = `${Math.min(index * 60, 360)}ms`;
+
+            if (prefersReducedMotion || !revealObserver) {
+                el.classList.add('is-visible');
+            } else {
+                revealObserver.observe(el);
+            }
+        });
+
+        root.querySelectorAll('[data-citizen-counter]').forEach((counter) => {
+            if (counter.dataset.counterBound === '1') return;
+            counter.dataset.counterBound = '1';
+
+            if (prefersReducedMotion || !revealObserver) {
+                animateCounter(counter);
+            } else {
+                revealObserver.observe(counter);
+            }
+        });
+    };
+
+    window.initCitizenGlobalUX(document);
+
+    /* ── Card tilt micro-interaction on hover ── */
+    if (!prefersReducedMotion) {
+        document.querySelectorAll('.citizen-kpi-card, .citizen-hero-panel').forEach((card) => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
+                card.style.transform = `perspective(600px) rotateY(${x * 4}deg) rotateX(${-y * 4}deg) translateY(-3px)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = '';
+            });
+        });
+    }
+})();
+
+(function () {
+    const body = document.body;
+    if (!body.classList.contains('es-role-office_user')) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ── Topbar scroll shadow ── */
+    const topbar = document.querySelector('.es-topbar');
+    if (topbar) {
+        let ticking = false;
+        const syncTopbarState = () => {
+            topbar.classList.toggle('is-scrolled', window.scrollY > 6);
+            ticking = false;
+        };
+        syncTopbarState();
+        window.addEventListener('scroll', () => {
+            if (!ticking) { ticking = true; requestAnimationFrame(syncTopbarState); }
+        }, { passive: true });
+    }
+
+    /* ── Elastic ease-out counter animation ── */
+    const elasticEaseOut = (t) => {
+        if (t === 0 || t === 1) return t;
+        return Math.pow(2, -10 * t) * Math.sin((t - 0.075) * (2 * Math.PI) / 0.3) + 1;
+    };
+
+    const animateCounter = (el) => {
+        if (!el || el.dataset.officeCounterAnimated === '1') return;
+        el.dataset.officeCounterAnimated = '1';
+
+        const target = Number(el.dataset.officeCounter || el.textContent || 0);
+        if (!Number.isFinite(target)) return;
+
+        if (prefersReducedMotion) {
+            el.textContent = String(Math.round(target));
+            return;
+        }
+
+        const duration = 900;
+        const startTime = performance.now();
+        const step = (now) => {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased = elasticEaseOut(progress);
+            el.textContent = String(Math.round(target * eased));
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            } else {
+                el.textContent = String(Math.round(target));
+            }
+        };
+
+        requestAnimationFrame(step);
+    };
+
+    /* ── IntersectionObserver for reveals ── */
+    const revealObserver = !prefersReducedMotion && 'IntersectionObserver' in window
+        ? new IntersectionObserver((entries, observer) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                if (entry.target.matches('[data-office-counter]')) {
+                    animateCounter(entry.target);
+                }
+                observer.unobserve(entry.target);
+            });
+        }, { threshold: 0.12 })
+        : null;
+
+    window.initOfficeGlobalUX = function initOfficeGlobalUX(root = document) {
+        /* Staggered reveals — wider delay */
+        const revealItems = root.querySelectorAll('.office-reveal, [data-office-reveal]');
+        revealItems.forEach((el, index) => {
+            if (el.dataset.officeRevealBound === '1') return;
+            el.dataset.officeRevealBound = '1';
+            el.style.transitionDelay = `${Math.min(index * 60, 360)}ms`;
+
+            if (prefersReducedMotion || !revealObserver) {
+                el.classList.add('is-visible');
+            } else {
+                revealObserver.observe(el);
+            }
+        });
+
+        /* Counters */
+        root.querySelectorAll('[data-office-counter]').forEach((counter) => {
+            if (counter.dataset.officeCounterBound === '1') return;
+            counter.dataset.officeCounterBound = '1';
+
+            if (prefersReducedMotion || !revealObserver) {
+                animateCounter(counter);
+            } else {
+                revealObserver.observe(counter);
+            }
+        });
+
+        /* ── Card tilt micro-interaction ── */
+        if (!prefersReducedMotion) {
+            root.querySelectorAll('.office-kpi-card, .office-hero-panel').forEach((card) => {
+                if (card.dataset.officeTiltBound === '1') return;
+                card.dataset.officeTiltBound = '1';
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / rect.width - 0.5;
+                    const y = (e.clientY - rect.top) / rect.height - 0.5;
+                    card.style.transform = `perspective(600px) rotateY(${x * 4}deg) rotateX(${-y * 4}deg) translateY(-3px)`;
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = '';
+                });
+            });
+        }
+    };
+
+    window.initOfficeGlobalUX(document);
 })();
 </script>
+
 @stack('scripts')
 </body>
 </html>

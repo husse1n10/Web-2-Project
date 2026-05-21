@@ -1,4 +1,4 @@
-# Running Guide - E-Services Platform
+# Running Guide - CedarGov Platform
 
 This guide is for team setup and local deployment.
 
@@ -65,7 +65,7 @@ MAIL_PORT=2525
 MAIL_USERNAME=your_mail_username
 MAIL_PASSWORD=your_mail_password
 MAIL_FROM_ADDRESS=noreply@eservices.gov.lb
-MAIL_FROM_NAME="E-Services Platform"
+MAIL_FROM_NAME="CedarGov Platform"
 ```
 
 ### Social Login (Google + GitHub)
