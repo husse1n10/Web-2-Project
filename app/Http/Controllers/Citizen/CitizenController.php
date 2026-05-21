@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Citizen;
 
 use App\Http\Controllers\Controller;
 use App\Events\{AppointmentReminderBroadcast, NewRequestSubmitted, RequestDocumentUploaded, ServiceRequestStatusUpdated};
+use App\Exceptions\SmsDeliveryException;
 use App\Models\{Appointment, Feedback, Message, Office, Service, ServiceRequest, SupportTicket, SupportTicketMessage, User};
 use App\Notifications\AppointmentReminder;
 use App\Notifications\NewSupportTicketNotification;
@@ -21,6 +22,7 @@ use App\Events\MessageSent;
 use App\Events\MessagesRead;
 use App\Events\SupportTicketMessageSent;
 use App\Support\PhoneNumber;
+use Throwable;
 
 class CitizenController extends Controller
 {
@@ -60,16 +62,24 @@ class CitizenController extends Controller
         $user = Auth::user();
 
         $hasDocumentUpload = $request->hasFile('national_id_document');
+        $canUpdateIdentityDetails = $user->isCitizen() && !$user->isCitizenIdentityApproved();
+        $wantsIdentityUpdate = $canUpdateIdentityDetails
+            && ($hasDocumentUpload || $request->filled('name') || $request->filled('national_id'));
         $wantsPasswordUpdate = $request->filled('password')
             || $request->filled('password_confirmation');
 
-        if (!$hasDocumentUpload && !$wantsPasswordUpdate) {
+        if (!$hasDocumentUpload && !$wantsIdentityUpdate && !$wantsPasswordUpdate) {
             return back()->with('info', 'No profile changes were submitted.');
         }
 
         $rules = [];
         if ($hasDocumentUpload) {
             $rules['national_id_document'] = ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'];
+        }
+
+        if ($wantsIdentityUpdate) {
+            $rules['name'] = ['nullable', 'string', 'max:100'];
+            $rules['national_id'] = ['nullable', 'string', 'max:20'];
         }
 
         if ($wantsPasswordUpdate) {
@@ -94,6 +104,19 @@ class CitizenController extends Controller
             $user->citizen_verified_by = null;
         }
 
+        if ($wantsIdentityUpdate) {
+            $name = trim((string) $request->input('name', ''));
+            $nationalId = trim((string) $request->input('national_id', ''));
+
+            if ($name !== '') {
+                $user->name = $name;
+            }
+
+            if ($nationalId !== '') {
+                $user->national_id = $nationalId;
+            }
+        }
+
         if ($wantsPasswordUpdate) {
             $user->password = Hash::make($data['password']);
         }
@@ -102,7 +125,7 @@ class CitizenController extends Controller
 
         $message = $hasDocumentUpload && $wantsPasswordUpdate
             ? 'Profile document and password updated successfully.'
-            : ($hasDocumentUpload ? 'National ID document uploaded successfully. It is now pending admin validation.' : 'Password updated successfully.');
+            : ($hasDocumentUpload ? 'National ID details uploaded successfully. They are now pending admin validation.' : 'Profile updated successfully.');
 
         return back()->with('success', $message);
     }
@@ -152,13 +175,43 @@ class CitizenController extends Controller
 
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
+        try {
+            Notification::route('sms', $phone)
+                ->notify(new PhoneVerificationNotification($otp));
+        } catch (SmsDeliveryException $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'sent' => false,
+                    'message' => $e->getMessage(),
+                    'errors' => [
+                        'phone' => [$e->getMessage()],
+                    ],
+                ], 502);
+            }
+
+            return back()->withErrors(['phone' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            report($e);
+
+            $message = 'Could not send the verification code. Please try again later.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'sent' => false,
+                    'message' => $message,
+                    'errors' => [
+                        'phone' => [$message],
+                    ],
+                ], 502);
+            }
+
+            return back()->withErrors(['phone' => $message]);
+        }
+
         Cache::put('phone_otp_' . Auth::id(), [
             'otp'   => $otp,
             'phone' => $phone,
         ], now()->addMinutes(5));
-
-        Notification::route('sms', $phone)
-            ->notify(new PhoneVerificationNotification($otp));
 
         if ($request->expectsJson()) {
             return response()->json([

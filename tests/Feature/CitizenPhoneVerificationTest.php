@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\PhoneVerificationNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -100,6 +101,37 @@ class CitizenPhoneVerificationTest extends TestCase
         $this->assertIsArray($cached);
         $this->assertSame('+96171123456', $cached['phone'] ?? null);
         $this->assertMatchesRegularExpression('/^\d{6}$/', $cached['otp'] ?? '');
+    }
+
+    public function test_twilio_rejection_returns_json_error_and_does_not_cache_otp(): void
+    {
+        config()->set('services.sms.driver', 'twilio');
+        config()->set('services.twilio.sid', 'ACtest');
+        config()->set('services.twilio.token', 'secret');
+        config()->set('services.twilio.from', '+14155238886');
+        config()->set('services.twilio.channel', 'whatsapp');
+
+        Http::fake([
+            'https://api.twilio.com/2010-04-01/Accounts/ACtest/Messages.json' => Http::response([
+                'code' => 63038,
+                'message' => 'Daily message limit exceeded.',
+            ], 429),
+        ]);
+
+        $citizen = $this->makeCitizen();
+
+        $response = $this->actingAs($citizen)
+            ->postJson(route('citizen.profile.phone.send'), [
+                'phone' => '+96171123456',
+            ]);
+
+        $response->assertStatus(502)
+            ->assertJson([
+                'sent' => false,
+                'message' => 'Twilio WhatsApp sandbox daily message limit reached. Try again tomorrow or use SMS/log mode locally.',
+            ]);
+
+        $this->assertNull(Cache::get('phone_otp_' . $citizen->id));
     }
 
     public function test_valid_phone_otp_returns_json_success_and_verifies_phone(): void

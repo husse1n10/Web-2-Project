@@ -29,6 +29,7 @@
         'rejected' => __('Rejected'),
         default    => __('Pending'),
     };
+    $canUpdateIdentityDetails = $user->isCitizen() && !$user->isCitizenIdentityApproved();
 @endphp
 
 <div class="citizen-profile-grid">
@@ -135,9 +136,23 @@
                             <label class="form-label">{{ __('Full Name') }}</label>
                             <div class="citizen-input-wrap">
                                 <i class="bi bi-person citizen-input-icon"></i>
-                                <input type="text" class="form-control citizen-disabled-input" value="{{ $user->name }}" disabled>
+                                <input
+                                    type="text"
+                                    id="profile_name"
+                                    name="{{ $canUpdateIdentityDetails ? 'name' : '' }}"
+                                    class="form-control {{ $canUpdateIdentityDetails ? '' : 'citizen-disabled-input' }}"
+                                    value="{{ old('name', $user->name) }}"
+                                    @disabled(!$canUpdateIdentityDetails)
+                                >
                             </div>
-                            <div class="form-text">{{ __('Name cannot be changed. Contact support if needed.') }}</div>
+                            <div class="form-text">
+                                {{ $canUpdateIdentityDetails
+                                    ? __('OCR can update this from your National ID document before admin approval.')
+                                    : __('Name cannot be changed. Contact support if needed.') }}
+                            </div>
+                            @error('name')
+                                <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
+                            @enderror
                         </div>
                         <div>
                             <label class="form-label">{{ __('Email Address') }}</label>
@@ -151,9 +166,24 @@
                             <label class="form-label">{{ __('National ID Number') }}</label>
                             <div class="citizen-input-wrap">
                                 <i class="bi bi-credit-card-2-front citizen-input-icon"></i>
-                                <input type="text" class="form-control citizen-disabled-input citizen-mono" value="{{ $user->national_id ?? __('Not set') }}" disabled>
+                                <input
+                                    type="text"
+                                    id="national_id"
+                                    name="{{ $canUpdateIdentityDetails ? 'national_id' : '' }}"
+                                    class="form-control citizen-mono {{ $canUpdateIdentityDetails ? '' : 'citizen-disabled-input' }}"
+                                    value="{{ old('national_id', $user->national_id) }}"
+                                    placeholder="{{ __('Not set') }}"
+                                    @disabled(!$canUpdateIdentityDetails)
+                                >
                             </div>
-                            <div class="form-text">{{ __('National ID cannot be changed. Contact support if needed.') }}</div>
+                            <div class="form-text">
+                                {{ $canUpdateIdentityDetails
+                                    ? __('OCR can update this from your National ID document before admin approval.')
+                                    : __('National ID cannot be changed. Contact support if needed.') }}
+                            </div>
+                            @error('national_id')
+                                <div class="text-danger" style="font-size:.75rem">{{ $message }}</div>
+                            @enderror
                         </div>
                         <div>
                             <label class="form-label">{{ __('National ID Document') }}</label>
@@ -1072,6 +1102,7 @@ const input = document.getElementById('national_id_doc');
 const preview = document.getElementById('uploadPreview');
 const nameEl = document.getElementById('uploadName');
 const ocrStatus = document.getElementById('ocrStatus');
+const profileNameInput = document.getElementById('profile_name');
 const nationalIdInput = document.getElementById('national_id');
 const extractEndpoint = '{{ route('citizen.profile.id-extract') }}';
 const csrfToken = '{{ csrf_token() }}';
@@ -1123,7 +1154,16 @@ async function runExtraction(file) {
             return;
         }
 
-        if (payload?.data?.national_id && nationalIdInput && !nationalIdInput.value.trim()) {
+        const extractedName = [
+            payload?.data?.first_name,
+            payload?.data?.last_name,
+        ].filter(Boolean).join(' ').trim();
+
+        if (extractedName && profileNameInput && !profileNameInput.disabled) {
+            profileNameInput.value = extractedName;
+        }
+
+        if (payload?.data?.national_id && nationalIdInput && !nationalIdInput.disabled) {
             nationalIdInput.value = payload.data.national_id;
         }
 
