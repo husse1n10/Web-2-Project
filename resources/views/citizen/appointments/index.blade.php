@@ -45,6 +45,7 @@
                                 data-office-id="{{ $requestItem->office_id }}"
                                 data-request-id="{{ $requestItem->id }}"
                                 data-request-label="{{ $requestItem->resolved_service_name }} - {{ $requestItem->reference_number }}"
+                                data-slots-url="{{ route('citizen.offices.slots', $requestItem->office_id) }}"
                             >
                                 <i class="bi {{ $citizenActionLocked ? 'bi-lock' : 'bi-calendar-plus' }} me-1"></i> {{ $citizenActionLocked ? __('Profile Verification Required') : __('Book') }}
                             </button>
@@ -184,18 +185,21 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ route('citizen.appointments.book') }}" method="POST">
+            <form action="{{ route('citizen.appointments.book') }}" method="POST" id="appointmentBookingForm" data-slots-form>
                 @csrf
                 <input type="hidden" name="office_id" id="appointmentOfficeId">
                 <input type="hidden" name="service_request_id" id="appointmentRequestId">
                 <div class="modal-body pt-2">
                     <div class="mb-3">
-                        <label class="form-label">Preferred Date</label>
-                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required @disabled($citizenActionLocked)>
+                        <label class="form-label">{{ __('Preferred Date') }}</label>
+                        <input type="date" name="appointment_date" class="form-control" min="{{ now()->addDay()->format('Y-m-d') }}" required data-slots-date @disabled($citizenActionLocked)>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Preferred Time</label>
-                        <input type="time" name="appointment_time" class="form-control" required @disabled($citizenActionLocked)>
+                        <label class="form-label">{{ __('Available Time Slots') }}</label>
+                        <select name="appointment_time" class="form-select" required data-slots-select disabled>
+                            <option value="">{{ __('Pick a date first…') }}</option>
+                        </select>
+                        <div class="form-text" data-slots-status></div>
                     </div>
                     <div>
                         <label class="form-label">Notes (optional)</label>
@@ -388,13 +392,75 @@ body.es-role-citizen .citizen-appt-pagination {
 
 @push('scripts')
 <script>
-document.querySelectorAll('[data-book-appointment]').forEach((button) => {
-    button.addEventListener('click', () => {
-        document.getElementById('appointmentOfficeId').value = button.dataset.officeId;
-        document.getElementById('appointmentRequestId').value = button.dataset.requestId;
-        document.getElementById('appointmentBookingRequest').textContent = button.dataset.requestLabel || '';
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('appointmentBookingModal')).show();
+(() => {
+    const form      = document.getElementById('appointmentBookingForm');
+    const dateInput = form?.querySelector('[data-slots-date]');
+    const select    = form?.querySelector('[data-slots-select]');
+    const status    = form?.querySelector('[data-slots-status]');
+
+    const setStatus = (text) => { if (status) status.textContent = text; };
+
+    const resetSlots = () => {
+        if (!select) return;
+        select.innerHTML = '<option value="">Pick a date first…</option>';
+        select.disabled = true;
+        setStatus('');
+    };
+
+    const loadSlots = async () => {
+        if (!select || !dateInput) return;
+        const url  = form.dataset.slotsUrl;
+        const date = dateInput.value;
+        if (!url || !date) {
+            resetSlots();
+            return;
+        }
+        select.disabled = true;
+        select.innerHTML = '<option value="">Loading slots…</option>';
+        setStatus('Checking availability…');
+
+        try {
+            const res = await fetch(`${url}?date=${encodeURIComponent(date)}`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!res.ok) throw new Error('Failed to load slots');
+            const data = await res.json();
+
+            if (!data.slots || data.slots.length === 0) {
+                select.innerHTML = '<option value="">No slots available on this date</option>';
+                setStatus('The office is closed or fully booked on this date.');
+                return;
+            }
+
+            select.innerHTML = '<option value="">Select a time…</option>' +
+                data.slots.map(s => `<option value="${s}">${s}</option>`).join('');
+            select.disabled = false;
+            setStatus(`${data.slots.length} slot${data.slots.length === 1 ? '' : 's'} available.`);
+        } catch (err) {
+            select.innerHTML = '<option value="">Could not load slots</option>';
+            setStatus('Something went wrong — please try again.');
+        }
+    };
+
+    dateInput?.addEventListener('change', loadSlots);
+
+    document.querySelectorAll('[data-book-appointment]').forEach((button) => {
+        button.addEventListener('click', () => {
+            document.getElementById('appointmentOfficeId').value = button.dataset.officeId;
+            document.getElementById('appointmentRequestId').value = button.dataset.requestId;
+            document.getElementById('appointmentBookingRequest').textContent = button.dataset.requestLabel || '';
+
+            // Bind the slot endpoint for the office tied to this request, then reset
+            // the date + slot dropdown so a previous selection doesn't leak across opens.
+            if (form && button.dataset.slotsUrl) {
+                form.dataset.slotsUrl = button.dataset.slotsUrl;
+            }
+            if (dateInput) dateInput.value = '';
+            resetSlots();
+
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('appointmentBookingModal')).show();
+        });
     });
-});
+})();
 </script>
 @endpush
